@@ -1,0 +1,19 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/**",
+    "uploads/**",
+    "logs/**",
+    "*.sqlite",
+    "*.log",
+    ".git/**",
+    "dist/**",
+    "build/**"
+  ],
+  "delay": 2000,
+  "verbose": false,
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
