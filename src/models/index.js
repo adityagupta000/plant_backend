@@ -92,17 +92,11 @@ Prediction.belongsTo(PredictionSession, {
  * Sync Database
  * Create tables if they don't exist
  */
-const syncDatabase = async (options = {}) => {
+const syncDatabase = async () => {
   try {
-    const { force = false, alter = false } = options;
+    await sequelize.sync();
 
-    await sequelize.sync({ force, alter });
-
-    logger.info("Database synchronized successfully", {
-      force,
-      alter,
-    });
-
+    logger.info("Database synchronized successfully");
     return true;
   } catch (error) {
     logger.error("Error synchronizing database", {
