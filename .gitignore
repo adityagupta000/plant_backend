@@ -3,7 +3,6 @@ node_modules
 *.log
 venv/
 __pycache__/
-# saved_models/
 *.pdf
 *.csv
 .DS_Store
@@ -19,7 +18,6 @@ pdf.py
 .env.production
 .env.development
 .env
-backend/ai/secrets/
 *.key
 best_model.encrypted
 *.pth
@@ -27,3 +25,4 @@ model_encryption.py
 *.jpg
 *.png
 *.jpeg
+*.sqlite
