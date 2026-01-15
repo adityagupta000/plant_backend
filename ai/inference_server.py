@@ -1,5 +1,6 @@
 """
 Secure Inference Server with Encrypted Model Loading
+CRITICAL FIX: Ensure clean JSON output on stdout
 """
 
 import sys
@@ -188,8 +189,8 @@ def generate_explanation(predicted_class, confidence, conf_level):
     explanations = {
         "Healthy": "Plant appears healthy with no visible issues detected.",
         "Pest_Fungal": "Fungal infection detected. Look for powdery spots, mold, or discoloration. Treatment: Apply fungicide and improve air circulation.",
-        "Pest_Bacterial": "Bacterial infection detected. Water-soaked lesions or wilting observed. Treatment: Use copper-based bactericide.",
-        "Pest_Insect": "Insect damage detected. Holes, chewed edges, or insect presence. Treatment: Apply appropriate insecticide.",
+        "Pest_Bacterial": "Bacterial infection detected. Water-soaked lesions or wilting observed. Treatment: Use copper-based bactericide and remove infected parts.",
+        "Pest_Insect": "Insect damage detected. Holes, chewed edges, or insect presence. Treatment: Apply appropriate insecticide or use neem oil.",
         "Nutrient_Nitrogen": "Nitrogen deficiency detected. Yellowing of older leaves, stunted growth. Treatment: Apply nitrogen-rich fertilizer.",
         "Nutrient_Potassium": "Potassium deficiency detected. Leaf edge browning, weak stems. Treatment: Apply potassium fertilizer.",
         "Water_Stress": "Water stress detected. Wilting or dry soil conditions. Treatment: Adjust watering schedule."
@@ -310,12 +311,14 @@ def run_server():
     _model = load_model_securely()
     _transform = get_transform()
     
+    # CRITICAL: Write READY to stdout and flush immediately
     sys.stdout.write("READY\n")
     sys.stdout.flush()
     
     sys.stderr.write(f"Worker {WORKER_ID}: Ready to process requests\n")
     sys.stderr.flush()
     
+    # Process requests line by line
     for line in sys.stdin:
         try:
             request = json.loads(line.strip())
@@ -327,28 +330,40 @@ def run_server():
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"Image not found: {image_path}")
             
+            # Run prediction
             result = predict(image_path)
             
+            # CRITICAL: Create response with success and data
             response = {
                 "success": True,
                 "data": result
             }
             
+            # CRITICAL: Write ONLY the JSON response to stdout, followed by newline
+            # Do NOT write any other text to stdout
             sys.stdout.write(json.dumps(response) + "\n")
-            sys.stdout.write("END\n")
             sys.stdout.flush()
+            
+            # Log to stderr (not stdout)
+            sys.stderr.write(f"Worker {WORKER_ID}: Prediction complete for {image_path}\n")
+            sys.stderr.flush()
             
         except Exception as e:
             import traceback
+            
+            # Log error to stderr
+            sys.stderr.write(f"Worker {WORKER_ID}: Error processing request: {str(e)}\n")
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.flush()
+            
+            # Send error response to stdout
             error_response = {
                 "success": False,
                 "error": str(e),
-                "error_type": type(e).__name__,
-                "traceback": traceback.format_exc()
+                "error_type": type(e).__name__
             }
             
             sys.stdout.write(json.dumps(error_response) + "\n")
-            sys.stdout.write("END\n")
             sys.stdout.flush()
 
 def signal_handler(sig, frame):

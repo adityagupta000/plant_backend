@@ -1,3 +1,6 @@
+// FIXED: Properly handle AI worker pool response structure
+// File: src/services/ai.service.js
+
 const aiWorkerPool = require("./ai.service.pool");
 const logger = require("../utils/logger");
 
@@ -42,6 +45,7 @@ class AIService {
 
   /**
    * Make prediction (now uses worker pool)
+   * CRITICAL FIX: Return structure exactly as Python sends it
    */
   async predict(imagePath) {
     try {
@@ -51,12 +55,22 @@ class AIService {
       }
 
       // Use worker pool for prediction
+      // This returns: {success: true, data: {...}} OR {success: false, error: "..."}
       const result = await aiWorkerPool.predict(imagePath);
 
+      logger.info("AI worker pool returned result", {
+        success: result.success,
+        hasData: !!result.data,
+        hasError: !!result.error,
+      });
+
+      // Return exactly what Python sent
       return result;
+      
     } catch (error) {
       logger.error("Prediction error", {
         error: error.message,
+        stack: error.stack,
       });
 
       return {

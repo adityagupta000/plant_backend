@@ -1,8 +1,5 @@
-// CRITICAL FIXES:
-// 1. Increased timeout for first prediction (model warm-up)
-// 2. Better error handling and logging
-// 3. Flush stdout after each write
-// 4. Add keepalive mechanism
+// CRITICAL FIX: Remove double-wrapping of AI response
+// File: src/services/ai.service.pool.js
 
 const { spawn } = require("child_process");
 const path = require("path");
@@ -22,7 +19,7 @@ class AIWorker extends EventEmitter {
     this.maxFailures = 3;
     this.lastError = null;
     this.activeTimeout = null;
-    this.firstPrediction = true; // Track first prediction for longer timeout
+    this.firstPrediction = true;
   }
 
   async start(pythonPath, scriptPath, modelPath) {
@@ -102,13 +99,12 @@ class AIWorker extends EventEmitter {
         this.process.on("error", onError);
         this.process.on("exit", onExit);
 
-        // Longer timeout for initialization
         initTimeout = setTimeout(() => {
           if (!this.isReady) {
             this.cleanup();
             reject(new Error(`Worker ${this.workerId} initialization timeout`));
           }
-        }, 60000); // 60 seconds for init
+        }, 60000);
       } catch (error) {
         reject(new Error(`Failed to spawn worker process: ${error.message}`));
       }
@@ -124,7 +120,6 @@ class AIWorker extends EventEmitter {
       throw new Error(`Image file not found: ${imagePath}`);
     }
 
-    // CRITICAL FIX: Use longer timeout for first prediction (model warm-up)
     const actualTimeout = timeout || (this.firstPrediction ? 120000 : 60000);
 
     logger.info(`Worker ${this.workerId} processing prediction`, {
@@ -159,13 +154,13 @@ class AIWorker extends EventEmitter {
           this.lastError = error;
           logger.error(`Worker ${this.workerId} prediction failed`, {
             error: error.message,
-            stderr: stderr.slice(-500), // Last 500 chars of stderr
+            stderr: stderr.slice(-500),
           });
           reject(error);
         } else {
           this.failureCount = 0;
           this.lastError = null;
-          this.firstPrediction = false; // Mark first prediction complete
+          this.firstPrediction = false;
           resolve(result);
         }
       };
@@ -183,27 +178,21 @@ class AIWorker extends EventEmitter {
         logger.debug(`Worker ${this.workerId} received stdout chunk`, {
           chunkSize: chunk.length,
           totalSize: stdout.length,
-          chunkPreview: chunk.substring(0, 100).replace(/\n/g, "\\n"),
         });
 
-        // CRITICAL: Look for complete JSON line (ends with newline)
+        // Look for complete JSON line
         const lines = stdout.split("\n");
 
-        // If we have at least one complete line (anything before last element)
         if (lines.length >= 2) {
-          // Try to parse the first complete line as JSON
           const jsonLine = lines[0].trim();
 
           if (jsonLine && jsonLine.length > 0) {
             try {
-              logger.debug(`Worker ${this.workerId} attempting to parse`, {
-                length: jsonLine.length,
-                preview: jsonLine.substring(0, 200),
-              });
-
               const result = JSON.parse(jsonLine);
 
-              // Validate it's our response format
+              // CRITICAL FIX: Return the exact structure from Python
+              // Python returns: {"success": true, "data": {...}}
+              // We should return that directly, not wrap it again
               if (result && typeof result === "object" && "success" in result) {
                 logger.info(
                   `Worker ${this.workerId} successfully parsed response`,
@@ -212,24 +201,14 @@ class AIWorker extends EventEmitter {
                     hasData: !!result.data,
                   }
                 );
+                // Return the result AS-IS from Python
                 cleanup(null, result);
-              } else {
-                // Not our response, keep accumulating
-                logger.debug(
-                  `Worker ${this.workerId} invalid response format`,
-                  {
-                    resultType: typeof result,
-                    hasSuccess: "success" in result,
-                  }
-                );
               }
             } catch (error) {
-              // If parse fails, it might not be complete yet
               logger.debug(
                 `Worker ${this.workerId} JSON parse error (may be incomplete)`,
                 {
                   error: error.message,
-                  position: error.message.match(/position (\d+)/)?.[1],
                 }
               );
             }
@@ -289,7 +268,6 @@ class AIWorker extends EventEmitter {
       this.process.on("error", onError);
       this.process.on("exit", onExit);
 
-      // Timeout
       const timeoutId = setTimeout(() => {
         cleanup(
           new Error(
@@ -448,7 +426,6 @@ class AIWorkerPool {
   }
 
   async getAvailableWorker(timeout = 120000) {
-    // Increased to 2 minutes
     const startTime = Date.now();
     const checkInterval = 100;
 
@@ -486,6 +463,7 @@ class AIWorkerPool {
         isFirstPrediction: worker.firstPrediction,
       });
 
+      // CRITICAL FIX: Get result from worker (already properly formatted)
       const result = await worker.predict(imagePath);
 
       this.stats.successfulPredictions++;
@@ -497,13 +475,11 @@ class AIWorkerPool {
         worker.kill();
       }
 
-      return {
-        success: true,
-        data: result,
-        processingTime: Date.now() - startTime,
-        workerId: worker.workerId,
-        waitTime,
-      };
+      // CRITICAL FIX: Return result directly from Python
+      // Python already returns: {success: true, data: {...}}
+      // Don't wrap it again!
+      return result;
+      
     } catch (error) {
       this.stats.failedPredictions++;
 
