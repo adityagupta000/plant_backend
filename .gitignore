@@ -7,6 +7,7 @@ saved_models/
 *.pdf
 *.csv
 .DS_Store
+.env
 .idea/
 pdf.py
 .vscode/
@@ -15,3 +16,6 @@ pdf.py
 *.pyd
 *.sqlite3
 *.db
+.env.production
+.env.development
+.env
