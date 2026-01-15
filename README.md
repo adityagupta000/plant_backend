@@ -1,6 +1,6 @@
 # Plant Health Detection Backend
 
-Production-ready Node.js backend with dual token authentication for plant disease detection system.
+Node.js backend with dual token authentication for plant disease detection system.
 
 ## 🌟 Features
 
