@@ -24,3 +24,6 @@ backend/ai/secrets/
 best_model.encrypted
 *.pth
 model_encryption.py
+*.jpg
+*.png
+*.jpeg
