@@ -1,6 +1,6 @@
 /**
  * Authentication Middleware
- * Protects routes and validates access tokens
+ * Updated to support optional authentication for privacy-first approach
  */
 
 const tokenService = require("../services/token.service");
@@ -10,16 +10,14 @@ const constants = require("../config/constants");
 const logger = require("../utils/logger");
 
 /**
- * Authenticate access token middleware
+ * Authenticate access token middleware (REQUIRED)
  * Extracts and validates JWT access token from Authorization header
  */
 const authenticateToken = async (req, res, next) => {
   try {
-    // Extract token from Authorization header
     const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(" ")[1];
 
-    // Check if token exists
     if (!token) {
       logger.warn("Access attempt without token", {
         path: req.path,
@@ -30,12 +28,10 @@ const authenticateToken = async (req, res, next) => {
         .json(formatErrorResponse("Access token required", "TOKEN_REQUIRED"));
     }
 
-    // Verify token signature and expiration
     let decoded;
     try {
       decoded = await tokenService.validateAccessToken(token);
     } catch (error) {
-      // Handle token expiration specifically
       if (error.code === constants.ERROR_CODES.TOKEN_EXPIRED) {
         logger.debug("Expired access token", {
           path: req.path,
@@ -51,7 +47,6 @@ const authenticateToken = async (req, res, next) => {
           );
       }
 
-      // Invalid token
       logger.warn("Invalid access token", {
         error: error.message,
         path: req.path,
@@ -61,7 +56,6 @@ const authenticateToken = async (req, res, next) => {
         .json(formatErrorResponse("Invalid access token", "INVALID_TOKEN"));
     }
 
-    // Verify user still exists and is active
     const userExists = await authService.verifyUser(decoded.userId);
 
     if (!userExists) {
@@ -75,16 +69,15 @@ const authenticateToken = async (req, res, next) => {
         );
     }
 
-    // Attach user info to request
     req.userId = decoded.userId;
     req.username = decoded.username;
+    req.isAuthenticated = true; // NEW: Flag for authenticated requests
 
     logger.debug("Authentication successful", {
       userId: decoded.userId,
       path: req.path,
     });
 
-    // Proceed to next middleware/route handler
     next();
   } catch (error) {
     logger.error("Error in authentication middleware", {
@@ -98,9 +91,9 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
- * Optional authentication middleware
+ * Optional authentication middleware (NEW)
  * Attaches user info if valid token is provided, but doesn't fail if missing
- * Useful for public endpoints that work better with authentication
+ * Useful for endpoints that work both authenticated and unauthenticated
  */
 const optionalAuth = async (req, res, next) => {
   try {
@@ -108,26 +101,37 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader && authHeader.split(" ")[1];
 
     if (!token) {
-      // No token provided, continue without authentication
+      // No token provided, continue as guest
+      req.isAuthenticated = false;
+      req.userId = null;
+      req.username = null;
       return next();
     }
 
     try {
       const decoded = await tokenService.validateAccessToken(token);
-
-      // Verify user exists
       const userExists = await authService.verifyUser(decoded.userId);
 
       if (userExists) {
         req.userId = decoded.userId;
         req.username = decoded.username;
-        req.authenticated = true;
+        req.isAuthenticated = true;
+        logger.debug("Optional auth: User authenticated", {
+          userId: decoded.userId,
+        });
+      } else {
+        req.isAuthenticated = false;
+        req.userId = null;
+        req.username = null;
       }
     } catch (error) {
-      // Silently fail - token invalid or expired
-      logger.debug("Optional auth token validation failed", {
+      // Token invalid or expired - continue as guest
+      logger.debug("Optional auth: Token validation failed", {
         error: error.message,
       });
+      req.isAuthenticated = false;
+      req.userId = null;
+      req.username = null;
     }
 
     next();
@@ -135,7 +139,11 @@ const optionalAuth = async (req, res, next) => {
     logger.error("Error in optional auth middleware", {
       error: error.message,
     });
-    next(); // Continue without authentication
+    // On error, continue as guest
+    req.isAuthenticated = false;
+    req.userId = null;
+    req.username = null;
+    next();
   }
 };
 

@@ -1,6 +1,6 @@
 /**
- * Prediction Service
- * Core business logic for predictions and history
+ * Prediction Service - FIXED
+ * Added better error handling and response validation
  */
 
 const { PredictionSession, Prediction } = require("../models");
@@ -11,12 +11,6 @@ const constants = require("../config/constants");
 const logger = require("../utils/logger");
 
 class PredictionService {
-  /**
-   * Create new session
-   * @param {Number} userId - User ID
-   * @param {String} title - Session title (optional)
-   * @returns {Object} Session object
-   */
   async createSession(userId, title = null) {
     try {
       const sessionTitle = title || generateDefaultSessionTitle();
@@ -42,15 +36,8 @@ class PredictionService {
     }
   }
 
-  /**
-   * Get or create session
-   * @param {Number} userId - User ID
-   * @param {Number} sessionId - Session ID (optional)
-   * @returns {Object} Session object
-   */
   async getOrCreateSession(userId, sessionId = null) {
     try {
-      // If sessionId provided, find existing session
       if (sessionId) {
         const session = await PredictionSession.findByIdAndUser(
           sessionId,
@@ -68,7 +55,6 @@ class PredictionService {
         });
       }
 
-      // Create new session
       return await this.createSession(userId);
     } catch (error) {
       logger.error("Error getting or creating session", {
@@ -80,13 +66,6 @@ class PredictionService {
     }
   }
 
-  /**
-   * Process prediction
-   * @param {Number} userId - User ID
-   * @param {Number} sessionId - Session ID (optional)
-   * @param {Object} file - Uploaded file
-   * @returns {Object} { success, session, prediction }
-   */
   async processPrediction(userId, sessionId, file) {
     const startTime = Date.now();
 
@@ -105,45 +84,92 @@ class PredictionService {
       });
 
       // Call AI service for prediction
+      logger.info("Calling AI service", {
+        imagePath: file.path,
+        fileExists: require("fs").existsSync(file.path),
+      });
+
       const aiResult = await aiService.predict(file.path);
+
+      logger.info("AI service returned", {
+        success: aiResult.success,
+        hasData: !!aiResult.data,
+        error: aiResult.error,
+      });
 
       const processingTime = Date.now() - startTime;
 
-      // Create prediction record
       let prediction;
 
-      if (!aiResult.success) {
+      // CRITICAL: Validate AI result structure
+      if (!aiResult.success || !aiResult.data) {
         // AI service failed - create failed prediction record
+        const errorMsg =
+          aiResult.error || "AI service returned invalid response";
+
+        logger.error("AI prediction failed", {
+          sessionId: session.id,
+          userId,
+          error: errorMsg,
+          aiResult: JSON.stringify(aiResult).substring(0, 500),
+        });
+
         prediction = await Prediction.create({
           session_id: session.id,
           user_id: userId,
           image_name: imageMetadata.originalName,
           image_url: imageMetadata.path,
           image_size: imageMetadata.size,
-          predicted_class: "N/A",
+          predicted_class: "Error",
           confidence: 0,
           status: constants.PREDICTION_STATUS.FAILED,
-          error_message: aiResult.error,
+          error_message: errorMsg,
           processing_time_ms: processingTime,
-        });
-
-        logger.error("Prediction failed", {
-          sessionId: session.id,
-          userId,
-          error: aiResult.error,
-          processingTime,
         });
 
         // Cleanup temp file
         await storageService.cleanupTempFile(file.path);
 
-        const error = new Error(aiResult.error);
+        const error = new Error(errorMsg);
+        error.code = "AI_PREDICTION_FAILED";
+        throw error;
+      }
+
+      // CRITICAL: Validate required fields in AI data
+      const aiData = aiResult.data;
+
+      if (!aiData.predicted_class || aiData.confidence === undefined) {
+        logger.error("AI data missing required fields", {
+          hasClass: !!aiData.predicted_class,
+          hasConfidence: aiData.confidence !== undefined,
+          aiData: JSON.stringify(aiData).substring(0, 500),
+        });
+
+        prediction = await Prediction.create({
+          session_id: session.id,
+          user_id: userId,
+          image_name: imageMetadata.originalName,
+          image_url: imageMetadata.path,
+          image_size: imageMetadata.size,
+          predicted_class: "Error",
+          confidence: 0,
+          status: constants.PREDICTION_STATUS.FAILED,
+          error_message: "AI returned incomplete data",
+          processing_time_ms: processingTime,
+        });
+
+        await storageService.cleanupTempFile(file.path);
+
+        const error = new Error("AI service returned incomplete data");
         error.code = "AI_PREDICTION_FAILED";
         throw error;
       }
 
       // AI service succeeded - create successful prediction record
-      const aiData = aiResult.data;
+      logger.info("Creating prediction record", {
+        predictedClass: aiData.predicted_class,
+        confidence: aiData.confidence,
+      });
 
       prediction = await Prediction.create({
         session_id: session.id,
@@ -159,9 +185,10 @@ class PredictionService {
         all_predictions: aiData.all_probabilities,
         confidence_level: aiData.confidence_level,
         explanation: aiData.explanation,
+        recommendations: aiData.recommendations || [],
         model_version: aiData.model_version || constants.MODEL_VERSION,
         model_name: constants.MODEL_NAME,
-        processing_time_ms: aiResult.processingTime,
+        processing_time_ms: aiResult.processingTime || processingTime,
         status: constants.PREDICTION_STATUS.SUCCESS,
       });
 
@@ -175,7 +202,7 @@ class PredictionService {
         userId,
         predictedClass: prediction.predicted_class,
         confidence: prediction.confidence,
-        processingTime: aiResult.processingTime,
+        processingTime: aiResult.processingTime || processingTime,
       });
 
       // Cleanup temp file (async)
@@ -194,6 +221,7 @@ class PredictionService {
 
       logger.error("Error processing prediction", {
         error: error.message,
+        stack: error.stack,
         userId,
         sessionId,
       });
@@ -202,13 +230,6 @@ class PredictionService {
     }
   }
 
-  /**
-   * Get user sessions
-   * @param {Number} userId - User ID
-   * @param {Number} limit - Results per page
-   * @param {Number} offset - Pagination offset
-   * @returns {Object} { count, rows }
-   */
   async getUserSessions(userId, limit = 50, offset = 0) {
     try {
       const result = await PredictionSession.findByUser(userId, limit, offset);
@@ -229,17 +250,8 @@ class PredictionService {
     }
   }
 
-  /**
-   * Get session predictions
-   * @param {Number} userId - User ID
-   * @param {Number} sessionId - Session ID
-   * @param {Number} limit - Results per page
-   * @param {Number} offset - Pagination offset
-   * @returns {Object} { count, rows }
-   */
   async getSessionPredictions(userId, sessionId, limit = 100, offset = 0) {
     try {
-      // Verify session belongs to user
       const session = await PredictionSession.findByIdAndUser(
         sessionId,
         userId
@@ -276,13 +288,6 @@ class PredictionService {
     }
   }
 
-  /**
-   * Update session title
-   * @param {Number} userId - User ID
-   * @param {Number} sessionId - Session ID
-   * @param {String} title - New title
-   * @returns {Object} Updated session
-   */
   async updateSessionTitle(userId, sessionId, title) {
     try {
       const success = await PredictionSession.updateTitle(
@@ -319,12 +324,6 @@ class PredictionService {
     }
   }
 
-  /**
-   * Delete session
-   * @param {Number} userId - User ID
-   * @param {Number} sessionId - Session ID
-   * @returns {Boolean} Success status
-   */
   async deleteSession(userId, sessionId) {
     try {
       const success = await PredictionSession.deleteByIdAndUser(
@@ -354,12 +353,6 @@ class PredictionService {
     }
   }
 
-  /**
-   * Get prediction by ID
-   * @param {Number} userId - User ID
-   * @param {Number} predictionId - Prediction ID
-   * @returns {Object} Prediction object
-   */
   async getPredictionById(userId, predictionId) {
     try {
       const prediction = await Prediction.findByIdAndUser(predictionId, userId);

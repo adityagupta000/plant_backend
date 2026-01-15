@@ -1,6 +1,6 @@
 /**
  * Application Constants
- * FIXED: Matches training model name exactly
+ * UPDATED: Added guest mode and privacy configuration
  */
 
 module.exports = {
@@ -22,7 +22,7 @@ module.exports = {
   // MODEL INFORMATION - CRITICAL FIX: MATCHES YOUR TRAINING EXACTLY
   // ============================================================================
 
-  MODEL_NAME: process.env.MODEL_NAME || 'efficientnet_b2', // FIXED: Was efficientnetv2_b2
+  MODEL_NAME: process.env.MODEL_NAME || 'efficientnet_b2',
   MODEL_VERSION: process.env.MODEL_VERSION || 'v1.0.0',
   MODEL_INPUT_SIZE: parseInt(process.env.MODEL_INPUT_SIZE) || 224,
 
@@ -45,6 +45,22 @@ module.exports = {
   AI_MAX_OUTPUT_SIZE: parseInt(process.env.AI_MAX_OUTPUT_SIZE) || 1048576, // 1MB
 
   // ============================================================================
+  // GUEST MODE CONFIGURATION (NEW)
+  // ============================================================================
+
+  GUEST_MODE_ENABLED: process.env.GUEST_MODE_ENABLED !== 'false', // Default: enabled
+  GUEST_PREDICTION_LIMIT: parseInt(process.env.GUEST_PREDICTION_LIMIT) || 10, // Per IP per day
+  TEMP_PDF_CLEANUP_DELAY: parseInt(process.env.TEMP_PDF_CLEANUP_DELAY) || 300000, // 5 minutes
+
+  // ============================================================================
+  // PRIVACY SETTINGS (NEW)
+  // ============================================================================
+
+  DEFAULT_STATELESS_MODE: process.env.DEFAULT_STATELESS_MODE !== 'false', // Default: true
+  ALLOW_OPTIONAL_LOGIN: process.env.ALLOW_OPTIONAL_LOGIN !== 'false', // Default: true
+  DATA_RETENTION_DAYS: parseInt(process.env.DATA_RETENTION_DAYS) || 90, // For logged-in users
+
+  // ============================================================================
   // RATE LIMITING CONFIGURATION
   // ============================================================================
 
@@ -59,6 +75,10 @@ module.exports = {
   // Health endpoint rate limit
   HEALTH_RATE_WINDOW_MS: parseInt(process.env.HEALTH_RATE_WINDOW_MS) || 60000,
   HEALTH_RATE_MAX: parseInt(process.env.HEALTH_RATE_MAX) || 10,
+
+  // Guest rate limit (NEW)
+  GUEST_RATE_WINDOW_MS: parseInt(process.env.GUEST_RATE_WINDOW_MS) || 3600000, // 1 hour
+  GUEST_RATE_MAX: parseInt(process.env.GUEST_RATE_MAX) || 10,
 
   // ============================================================================
   // SECURITY CONFIGURATION
@@ -161,11 +181,13 @@ module.exports = {
     // Validation Errors
     VALIDATION_ERROR: 'VALIDATION_ERROR',
     INVALID_INPUT: 'INVALID_INPUT',
+    PREDICTION_REQUIRED: 'PREDICTION_REQUIRED', // NEW
 
     // Rate Limiting
     RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
     AUTH_RATE_LIMIT_EXCEEDED: 'AUTH_RATE_LIMIT_EXCEEDED',
     HEALTH_RATE_LIMIT_EXCEEDED: 'HEALTH_RATE_LIMIT_EXCEEDED',
+    GUEST_RATE_LIMIT_EXCEEDED: 'GUEST_RATE_LIMIT_EXCEEDED', // NEW
 
     // Generic
     INTERNAL_ERROR: 'INTERNAL_ERROR',
@@ -241,7 +263,8 @@ module.exports = {
     REQUEST_TIMEOUT: 30000,
     DB_QUERY_TIMEOUT: 10000,
     FILE_UPLOAD_TIMEOUT: 60000,
-    AI_HEALTH_CHECK_TIMEOUT: 5000
+    AI_HEALTH_CHECK_TIMEOUT: 5000,
+    PDF_GENERATION_TIMEOUT: 15000 // NEW
   },
 
   // ============================================================================
@@ -255,5 +278,44 @@ module.exports = {
     IMAGE_FILENAME: /\.(jpg|jpeg|png)$/i,
     // Path traversal detection
     PATH_TRAVERSAL: /\.\.|\/\.\.|\\|%2e|%2f|%5c/i
+  },
+
+  // ============================================================================
+  // PDF CONFIGURATION (NEW)
+  // ============================================================================
+
+  PDF: {
+    PAGE_SIZE: 'A4',
+    MARGIN: 50,
+    TITLE_FONT_SIZE: 24,
+    HEADER_FONT_SIZE: 14,
+    BODY_FONT_SIZE: 11,
+    FOOTER_FONT_SIZE: 8,
+    TABLE_ROW_HEIGHT: 25,
+    TEMP_DIR: './temp_pdfs',
+    MAX_FILE_AGE_MS: 300000, // 5 minutes
+    COLORS: {
+      PRIMARY: '#3498db',
+      SUCCESS: '#27ae60',
+      WARNING: '#f39c12',
+      DANGER: '#e74c3c',
+      DARK: '#2c3e50',
+      LIGHT: '#ecf0f1',
+      GRAY: '#7f8c8d'
+    }
+  },
+
+  // ============================================================================
+  // FEATURES FLAGS (NEW)
+  // ============================================================================
+
+  FEATURES: {
+    GUEST_MODE: process.env.GUEST_MODE_ENABLED !== 'false',
+    OPTIONAL_LOGIN: process.env.ALLOW_OPTIONAL_LOGIN !== 'false',
+    PDF_DOWNLOAD: process.env.PDF_DOWNLOAD_ENABLED !== 'false',
+    HISTORY_TRACKING: process.env.HISTORY_TRACKING_ENABLED !== 'false',
+    EMAIL_NOTIFICATIONS: process.env.EMAIL_NOTIFICATIONS_ENABLED === 'true', // Default: disabled
+    CLOUD_STORAGE: process.env.CLOUD_STORAGE_ENABLED === 'true', // Default: disabled
+    ANALYTICS: process.env.ANALYTICS_ENABLED === 'true' // Default: disabled
   }
 };

@@ -1,11 +1,3 @@
-/**
- * FIXED Server Entry Point
- * FIXES:
- * 1. Database sync race condition protection
- * 2. Graceful AI service cleanup
- * 3. Proper signal handling
- */
-
 require("dotenv").config();
 
 const app = require("./app");
@@ -21,68 +13,59 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 
 let server;
 let isShuttingDown = false;
-let isSyncingDatabase = false; // FIXED: Prevent concurrent sync
+let isSyncingDatabase = false;
 
 /**
- * FIXED: Database sync with lock file protection
+ * Database sync with lock file protection
  */
 const syncDatabaseWithLock = async (options = {}) => {
-  const lockFile = path.join(__dirname, '../.db-sync.lock');
-  
+  const lockFile = path.join(__dirname, "../.db-sync.lock");
+
   try {
-    // Check if another process is syncing
     try {
       const lockStats = await fs.stat(lockFile);
       const lockAge = Date.now() - lockStats.mtimeMs;
-      
-      // If lock is older than 30 seconds, assume stale
+
       if (lockAge < 30000) {
-        logger.warn('Database sync already in progress, waiting...');
-        
-        // Wait up to 10 seconds for lock to release
+        logger.warn("Database sync already in progress, waiting...");
+
         for (let i = 0; i < 20; i++) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
           try {
             await fs.stat(lockFile);
           } catch {
-            // Lock released
             break;
           }
         }
       } else {
-        logger.warn('Stale lock file detected, removing...');
+        logger.warn("Stale lock file detected, removing...");
         await fs.unlink(lockFile);
       }
     } catch {
-      // Lock file doesn't exist - good to proceed
+      // Lock file doesn't exist
     }
 
-    // Create lock file
-    await fs.writeFile(lockFile, JSON.stringify({
-      pid: process.pid,
-      timestamp: Date.now()
-    }));
+    await fs.writeFile(
+      lockFile,
+      JSON.stringify({
+        pid: process.pid,
+        timestamp: Date.now(),
+      })
+    );
 
     isSyncingDatabase = true;
-
-    // Sync database
     await syncDatabase(options);
-
-    // Remove lock file
     await fs.unlink(lockFile);
     isSyncingDatabase = false;
 
     return true;
   } catch (error) {
     isSyncingDatabase = false;
-    
-    // Clean up lock file on error
+
     try {
       await fs.unlink(lockFile);
-    } catch {
-      // Ignore cleanup errors
-    }
-    
+    } catch {}
+
     throw error;
   }
 };
@@ -101,12 +84,24 @@ const startServer = async () => {
     logger.info("Testing database connection...");
     await testConnection();
 
-    // FIXED: Sync with lock protection
+    // Sync database
     logger.info("Synchronizing database models...");
     await syncDatabaseWithLock({
       force: false,
       alter: NODE_ENV === "development",
     });
+
+    // FIXED: Initialize AI service with worker pool
+    logger.info("Initializing AI worker pool...");
+    try {
+      await aiService.initialize();
+      logger.info("AI worker pool ready");
+    } catch (error) {
+      logger.error("Failed to initialize AI service", {
+        error: error.message,
+      });
+      logger.warn("Server will start but AI predictions will fail");
+    }
 
     // Start HTTP server
     server = app.listen(PORT, HOST, () => {
@@ -128,7 +123,6 @@ const startServer = async () => {
       console.log("=".repeat(60));
     });
 
-    // Handle server errors
     server.on("error", (error) => {
       if (error.code === "EADDRINUSE") {
         logger.error(`Port ${PORT} is already in use`);
@@ -148,7 +142,7 @@ const startServer = async () => {
 };
 
 /**
- * FIXED: Graceful shutdown with AI service cleanup
+ * Graceful shutdown
  */
 const gracefulShutdown = async (signal) => {
   if (isShuttingDown) {
@@ -159,29 +153,32 @@ const gracefulShutdown = async (signal) => {
   isShuttingDown = true;
   logger.info(`${signal} signal received: closing server gracefully`);
 
-  // Stop accepting new connections
   if (server) {
     server.close(async () => {
       logger.info("HTTP server closed");
 
       try {
-        // FIXED: Cleanup AI service (kill Python processes)
-        logger.info("Cleaning up AI service...");
+        // FIXED: Cleanup AI worker pool
+        logger.info("Cleaning up AI worker pool...");
         await aiService.cleanup();
 
         // Close database connection
         await closeConnection();
         logger.info("Database connection closed");
 
-        // FIXED: Clean up lock file if exists
+        // Clean up lock file
         if (isSyncingDatabase) {
           try {
-            const lockFile = path.join(__dirname, '../.db-sync.lock');
+            const lockFile = path.join(__dirname, "../.db-sync.lock");
             await fs.unlink(lockFile);
             logger.info("Removed database sync lock");
-          } catch {
-            // Ignore errors
-          }
+          } catch {}
+        }
+
+        // FIXED: Cleanup rate limiter Redis connection
+        const rateLimiter = require("./middlewares/rateLimiter.middleware");
+        if (rateLimiter.cleanup) {
+          await rateLimiter.cleanup();
         }
 
         logger.info("Graceful shutdown complete");

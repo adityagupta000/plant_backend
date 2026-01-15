@@ -123,6 +123,22 @@ module.exports = (sequelize) => {
         field: "explanation",
       },
 
+      recommendations: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: "recommendations",
+        get() {
+          const rawValue = this.getDataValue("recommendations");
+          return rawValue ? JSON.parse(rawValue) : [];
+        },
+        set(value) {
+          this.setDataValue(
+            "recommendations",
+            value && value.length > 0 ? JSON.stringify(value) : null
+          );
+        },
+      },
+
       // Metadata
       model_version: {
         type: DataTypes.STRING(50),
@@ -132,7 +148,7 @@ module.exports = (sequelize) => {
 
       model_name: {
         type: DataTypes.STRING(100),
-        defaultValue: "efficientnetv2_b2",
+        defaultValue: "efficientnet_b2", // FIXED: Changed from efficientnetv2_b2
         field: "model_name",
       },
 
