@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "nodemon --config nodemon.json src/server.js",
     "start": "node src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:guest": "node scripts/test-guest-predictions.js",
+    "check:redis": "redis-cli ping || echo 'Redis not running'",
+    "start:redis": "docker run -d -p 6379:6379 --name plant-health-redis redis:alpine"
   },
   "keywords": [],
   "author": "",

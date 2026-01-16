@@ -179,9 +179,18 @@ const gracefulShutdown = async (signal) => {
             const lockFile = path.join(__dirname, '../.db-sync.lock');
             await fs.unlink(lockFile);
             logger.info("Removed database sync lock");
+<<<<<<< Updated upstream
           } catch {
             // Ignore errors
           }
+=======
+          } catch {}
+        }
+
+        const rateLimiter = require("./middlewares/rateLimiter.middleware");
+        if (rateLimiter.cleanup) {
+          await rateLimiter.cleanup();
+>>>>>>> Stashed changes
         }
 
         logger.info("Graceful shutdown complete");

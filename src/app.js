@@ -11,9 +11,17 @@ const logger = require('./utils/logger');
 const errorMiddleware = require('./middlewares/error.middleware');
 
 // Import routes
+<<<<<<< Updated upstream
 const authRoutes = require('./routes/auth.routes');
 const predictionRoutes = require('./routes/prediction.routes');
 const historyRoutes = require('./routes/history.routes');
+=======
+const authRoutes = require("./routes/auth.routes");
+const predictionRoutes = require("./routes/prediction.routes");
+const historyRoutes = require("./routes/history.routes");
+const guestRoutes = require("./routes/guest.routes");
+const systemRoutes = require("./routes/system.routes");
+>>>>>>> Stashed changes
 
 // Create Express app
 const app = express();
@@ -25,6 +33,7 @@ const app = express();
 // Helmet - Security headers
 app.use(helmet());
 
+<<<<<<< Updated upstream
 // CORS - Cross-Origin Resource Sharing
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -33,6 +42,21 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Set-Cookie']
 }));
+=======
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Set-Cookie"],
+  })
+);
+
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+
+app.use(globalLimiter);
+>>>>>>> Stashed changes
 
 // ============================================================================
 // BODY PARSING MIDDLEWARE
@@ -84,6 +108,9 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/predict', predictionRoutes);
 app.use('/api/history', historyRoutes);
+
+// System routes (monitoring and diagnostics)
+app.use("/api/system", systemRoutes);
 
 // ============================================================================
 // 404 HANDLER
