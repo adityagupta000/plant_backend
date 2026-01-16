@@ -21,7 +21,6 @@ pdf.py
 *.key
 best_model.encrypted
 *.pth
-model_encryption.py
 *.jpg
 *.png
 *.jpeg
