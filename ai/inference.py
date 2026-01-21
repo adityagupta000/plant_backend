@@ -28,19 +28,20 @@ CONFIG = {
         'normalize_std': [0.229, 0.224, 0.225],
         'max_pixel_value': 255.0
     },
-    'classes': [
-        "Healthy",
-        "Pest_Fungal",
-        "Pest_Bacterial",
-        "Pest_Insect",
-        "Nutrient_Nitrogen",
-        "Nutrient_Potassium",
-        "Water_Stress"
-    ],
+   'classes': [
+    "Healthy",
+    "Pest_Fungal",
+    "Pest_Bacterial",
+    "Pest_Insect",
+    "Nutrient_Nitrogen",
+    "Nutrient_Potassium",
+    "Water_Stress",
+    "Not_Plant"
+],
     'model': {
-        'name': 'efficientnet_b2',  # FIXED: Match training (NOT efficientnetv2_b2)
+        'name': 'efficientnet_b2',
         'dropout': 0.2,
-        'num_classes': 7
+        'num_classes': 8
     }
 }
 
@@ -245,7 +246,9 @@ def parse_class_name(class_name):
     elif class_name == "Healthy":
         return "Healthy", None
     elif class_name == "Water_Stress":
-        return "Water Stress", None
+        return "Water Stress", None     
+    elif class_name == "Not_Plant": 
+        return "Invalid Input", None
     else:
         return class_name, None
 
@@ -271,7 +274,8 @@ def generate_explanation(predicted_class, confidence, conf_level):
         "Pest_Insect": "Insect damage detected. Holes, chewed edges, or insect presence. Treatment: insecticide or natural predators.",
         "Nutrient_Nitrogen": "Nitrogen deficiency detected. Yellowing of older leaves, stunted growth. Treatment: nitrogen fertilizer.",
         "Nutrient_Potassium": "Potassium deficiency detected. Leaf edge browning, weak stems. Treatment: potassium fertilizer.",
-        "Water_Stress": "Water stress detected. Wilting or dry soil. Treatment: adjust watering schedule."
+        "Water_Stress": "Water stress detected. Wilting or dry soil. Treatment: adjust watering schedule.",
+        "Not_Plant": "This is not a plant image. Please upload a clear image of a plant leaf for disease detection."
     }
     
     explanation = explanations.get(

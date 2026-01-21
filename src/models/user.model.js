@@ -66,6 +66,19 @@ module.exports = (sequelize) => {
         field: "is_active",
       },
 
+      role: {
+        type: DataTypes.ENUM("user", "admin"),
+        defaultValue: "user",
+        allowNull: false,
+        field: "role",
+        validate: {
+          isIn: {
+            args: [["user", "admin"]],
+            msg: "Role must be either user or admin",
+          },
+        },
+      },
+
       created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
@@ -132,7 +145,7 @@ module.exports = (sequelize) => {
           }
         },
       },
-    }
+    },
   );
 
   /**
@@ -169,6 +182,7 @@ module.exports = (sequelize) => {
       userId: this.id,
       username: this.username,
       email: this.email,
+      role: this.role,
     };
   };
 

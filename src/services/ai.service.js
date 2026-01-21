@@ -1,42 +1,54 @@
-// FIXED: Properly handle AI worker pool response structure
-// File: src/services/ai.service.js
+/**
+ * AI Service - Worker Pool Implementation
+ * Delegates to ai.service.pool.js for actual worker management
+ */
 
 const aiWorkerPool = require("./ai.service.pool");
 const logger = require("../utils/logger");
 
 class AIService {
   constructor() {
+    this.workerPool = aiWorkerPool;
     this.initialized = false;
   }
 
   /**
-   * Initialize the AI service (start worker pool)
+   * Initialize AI worker pool
    */
   async initialize() {
-    if (this.initialized) {
-      return;
-    }
-
     try {
-      await aiWorkerPool.initialize();
+      if (this.initialized) {
+        logger.warn("AI service already initialized");
+        return true;
+      }
+
+      logger.info("Initializing AI worker pool...");
+      await this.workerPool.initialize();
       this.initialized = true;
-      logger.info("AI service initialized with worker pool");
+
+      logger.info("AI worker pool initialized successfully");
+      return true;
     } catch (error) {
-      logger.error("Failed to initialize AI service", {
+      logger.error("Failed to initialize AI worker pool", {
         error: error.message,
+        stack: error.stack,
       });
-      throw error;
+      // Don't throw - allow server to start without AI
+      return false;
     }
   }
 
   /**
-   * Check health
+   * Check if AI service is healthy
    */
   async checkHealth() {
     try {
-      return await aiWorkerPool.checkHealth();
+      if (!this.initialized) {
+        return false;
+      }
+      return await this.workerPool.checkHealth();
     } catch (error) {
-      logger.error("AI service health check failed", {
+      logger.error("AI health check failed", {
         error: error.message,
       });
       return false;
@@ -44,33 +56,27 @@ class AIService {
   }
 
   /**
-   * Make prediction (now uses worker pool)
-   * CRITICAL FIX: Return structure exactly as Python sends it
+   * Make prediction using worker pool
+   * @param {String} imagePath - Path to image file
+   * @param {Number} retryCount - Current retry attempt
+   * @returns {Object} Prediction result
    */
-  async predict(imagePath) {
+  async predict(imagePath, retryCount = 0) {
     try {
-      // Ensure service is initialized
       if (!this.initialized) {
-        await this.initialize();
+        throw new Error("AI service not initialized");
       }
 
-      // Use worker pool for prediction
-      // This returns: {success: true, data: {...}} OR {success: false, error: "..."}
-      const result = await aiWorkerPool.predict(imagePath);
+      const result = await this.workerPool.predict(imagePath, retryCount);
 
-      logger.info("AI worker pool returned result", {
-        success: result.success,
-        hasData: !!result.data,
-        hasError: !!result.error,
-      });
-
-      // Return exactly what Python sent
+      // Result from pool is already in correct format:
+      // { success: true/false, data: {...} or error: "..." }
       return result;
-      
     } catch (error) {
-      logger.error("Prediction error", {
+      logger.error("Prediction failed in AI service", {
         error: error.message,
-        stack: error.stack,
+        imagePath,
+        retryCount,
       });
 
       return {
@@ -82,19 +88,72 @@ class AIService {
   }
 
   /**
-   * Get service statistics
+   * Get worker pool statistics
    */
   getStats() {
-    return aiWorkerPool.getStats();
+    if (!this.initialized) {
+      return {
+        initialized: false,
+        poolSize: 0,
+        activeWorkers: 0,
+        totalPredictions: 0,
+        successfulPredictions: 0,
+        failedPredictions: 0,
+      };
+    }
+    return this.workerPool.getStats();
   }
 
   /**
-   * Cleanup (shutdown worker pool)
+   * Get model information
+   */
+  getModelInfo() {
+    if (!this.initialized) {
+      return {
+        initialized: false,
+        poolSize: 0,
+        activeWorkers: 0,
+      };
+    }
+
+    const stats = this.workerPool.getStats();
+    return {
+      initialized: true,
+      poolSize: stats.poolSize,
+      activeWorkers: stats.activeWorkers,
+      busyWorkers: stats.busyWorkers,
+      availableWorkers: stats.availableWorkers,
+      totalPredictions: stats.totalPredictions,
+      successfulPredictions: stats.successfulPredictions,
+      failedPredictions: stats.failedPredictions,
+      successRate:
+        stats.totalPredictions > 0
+          ? (
+              (stats.successfulPredictions / stats.totalPredictions) *
+              100
+            ).toFixed(2) + "%"
+          : "N/A",
+      averageWaitTime: stats.averageWaitTime
+        ? `${stats.averageWaitTime.toFixed(0)}ms`
+        : "N/A",
+    };
+  }
+
+  /**
+   * Cleanup on shutdown
    */
   async cleanup() {
-    logger.info("Cleaning up AI service");
-    await aiWorkerPool.cleanup();
-    this.initialized = false;
+    try {
+      if (this.initialized) {
+        await this.workerPool.cleanup();
+        this.initialized = false;
+      }
+      logger.info("AI service cleanup complete");
+    } catch (error) {
+      logger.error("Error during AI service cleanup", {
+        error: error.message,
+      });
+    }
   }
 }
 

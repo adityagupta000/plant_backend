@@ -106,7 +106,7 @@ module.exports = (sequelize) => {
         set(value) {
           this.setDataValue(
             "all_predictions",
-            value ? JSON.stringify(value) : null
+            value ? JSON.stringify(value) : null,
           );
         },
       },
@@ -123,22 +123,6 @@ module.exports = (sequelize) => {
         field: "explanation",
       },
 
-      recommendations: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        field: "recommendations",
-        get() {
-          const rawValue = this.getDataValue("recommendations");
-          return rawValue ? JSON.parse(rawValue) : [];
-        },
-        set(value) {
-          this.setDataValue(
-            "recommendations",
-            value && value.length > 0 ? JSON.stringify(value) : null
-          );
-        },
-      },
-
       // Metadata
       model_version: {
         type: DataTypes.STRING(50),
@@ -148,7 +132,7 @@ module.exports = (sequelize) => {
 
       model_name: {
         type: DataTypes.STRING(100),
-        defaultValue: "efficientnet_b2", // FIXED: Changed from efficientnetv2_b2
+        defaultValue: "efficientnetv2_b2",
         field: "model_name",
       },
 
@@ -212,7 +196,7 @@ module.exports = (sequelize) => {
           }
         },
       },
-    }
+    },
   );
 
   /**
@@ -246,10 +230,22 @@ module.exports = (sequelize) => {
   // Find prediction by ID and user
   Prediction.findByIdAndUser = async function (predictionId, userId) {
     try {
+      // Validate inputs are numbers
+      const validPredictionId = parseInt(predictionId, 10);
+      const validUserId = parseInt(userId, 10);
+
+      if (isNaN(validPredictionId) || isNaN(validUserId)) {
+        throw new Error("Invalid ID format");
+      }
+
+      if (validPredictionId < 1 || validUserId < 1) {
+        throw new Error("Invalid ID value");
+      }
+
       const prediction = await this.findOne({
         where: {
-          id: predictionId,
-          user_id: userId,
+          id: validPredictionId,
+          user_id: validUserId,
         },
       });
       return prediction;
@@ -268,7 +264,7 @@ module.exports = (sequelize) => {
     sessionId,
     userId,
     limit = 100,
-    offset = 0
+    offset = 0,
   ) {
     try {
       const { count, rows } = await this.findAndCountAll({

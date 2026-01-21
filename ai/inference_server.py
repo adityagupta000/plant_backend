@@ -31,12 +31,13 @@ CONFIG = {
         "Pest_Insect",
         "Nutrient_Nitrogen",
         "Nutrient_Potassium",
-        "Water_Stress"
+        "Water_Stress",
+        "Not_Plant"
     ],
     'model': {
         'name': 'efficientnet_b2',
         'dropout': 0.2,
-        'num_classes': 7
+        'num_classes': 8
     }
 }
 
@@ -170,6 +171,8 @@ def parse_class_name(class_name):
         return "Healthy", None
     elif class_name == "Water_Stress":
         return "Water Stress", None
+    elif class_name == "Not_Plant": 
+        return "Invalid Input", None
     else:
         return class_name, None
 
@@ -193,7 +196,8 @@ def generate_explanation(predicted_class, confidence, conf_level):
         "Pest_Insect": "Insect damage detected. Holes, chewed edges, or insect presence. Treatment: Apply appropriate insecticide or use neem oil.",
         "Nutrient_Nitrogen": "Nitrogen deficiency detected. Yellowing of older leaves, stunted growth. Treatment: Apply nitrogen-rich fertilizer.",
         "Nutrient_Potassium": "Potassium deficiency detected. Leaf edge browning, weak stems. Treatment: Apply potassium fertilizer.",
-        "Water_Stress": "Water stress detected. Wilting or dry soil conditions. Treatment: Adjust watering schedule."
+        "Water_Stress": "Water stress detected. Wilting or dry soil conditions. Treatment: Adjust watering schedule.",
+        "Not_Plant": "This is not a plant image. Please upload a clear image of a plant leaf for disease detection."
     }
     
     explanation = explanations.get(
@@ -296,6 +300,9 @@ def get_recommendations(predicted_class):
             "Check soil moisture regularly",
             "Improve drainage if waterlogged",
             "Mulch to retain moisture"
+        ],
+        "Not_Plant": [
+            "Please upload a clear image of a plant leaf for disease detection."
         ]
     }
     

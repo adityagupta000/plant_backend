@@ -8,12 +8,15 @@ const {
   globalLimiter,
   healthLimiter,
 } = require("./middlewares/rateLimiter.middleware");
+// ENHANCEMENT: Import CSRF protection
+const { csrfErrorHandler } = require("./middlewares/csrf.middleware");
 
 // Import routes
 const authRoutes = require("./routes/auth.routes");
 const predictionRoutes = require("./routes/prediction.routes");
 const historyRoutes = require("./routes/history.routes");
 const guestRoutes = require("./routes/guest.routes");
+const systemRoutes = require("./routes/system.routes");
 
 // Create Express app
 const app = express();
@@ -42,7 +45,7 @@ app.use(
     },
     noSniff: true,
     xssFilter: true,
-  })
+  }),
 );
 
 app.use(
@@ -50,12 +53,12 @@ app.use(
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Set-Cookie"],
-  })
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"], // ENHANCEMENT: Allow CSRF header
+    exposedHeaders: ["Set-Cookie", "X-CSRF-Token"], // ENHANCEMENT: Expose CSRF header
+  }),
 );
 
-app.get('/favicon.ico', (req, res) => res.status(204).end());
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 app.use(globalLimiter);
 
@@ -63,7 +66,7 @@ app.use(globalLimiter);
 // BODY PARSING MIDDLEWARE
 // ============================================================================
 
-app.use(cookieParser());
+app.use(cookieParser()); // MUST be before CSRF
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -99,10 +102,13 @@ app.get("/health", healthLimiter, (req, res) => {
 // API ROUTES
 // ============================================================================
 
-// NEW: Guest routes (no authentication required)
+// System routes (monitoring/diagnostics)
+app.use("/api/system", systemRoutes);
+
+// Guest routes (no authentication required, no CSRF needed)
 app.use("/api/guest", guestRoutes);
 
-// Authenticated routes
+// Authenticated routes (with CSRF protection)
 app.use("/api/auth", authRoutes);
 app.use("/api/predict", predictionRoutes);
 app.use("/api/history", historyRoutes);
@@ -127,6 +133,9 @@ app.use((req, res) => {
 // ============================================================================
 // ERROR HANDLING MIDDLEWARE (MUST BE LAST)
 // ============================================================================
+
+// ENHANCEMENT: CSRF error handler (before general error handler)
+app.use(csrfErrorHandler);
 
 app.use(errorMiddleware);
 

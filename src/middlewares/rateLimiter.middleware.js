@@ -1,7 +1,7 @@
-// ============================================================================
-// FILE 1: src/middlewares/rateLimiter.middleware.js
-// FIXED: Added all missing rate limiters with Redis support
-// ============================================================================
+/**
+ * Rate Limiter Middleware
+ * Comprehensive rate limiting with Redis support
+ */
 
 const rateLimit = require("express-rate-limit");
 const RedisStore = require("rate-limit-redis");
@@ -11,13 +11,12 @@ const { formatErrorResponse } = require("../utils/helpers");
 const logger = require("../utils/logger");
 
 // ============================================================================
-// REDIS CLIENT SETUP (for distributed rate limiting)
+// REDIS CLIENT SETUP
 // ============================================================================
 
 let redisClient = null;
 let useRedis = false;
 
-// Initialize Redis if configured
 if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
   try {
     redisClient = new Redis({
@@ -25,10 +24,7 @@ if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
       port: parseInt(process.env.REDIS_PORT),
       password: process.env.REDIS_PASSWORD || undefined,
       db: parseInt(process.env.REDIS_DB) || 0,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+      retryStrategy: (times) => Math.min(times * 50, 2000),
       maxRetriesPerRequest: 3,
     });
 
@@ -51,7 +47,7 @@ if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
 }
 
 // ============================================================================
-// HELPER: Create rate limiter with optional Redis
+// HELPER: Create rate limiter
 // ============================================================================
 
 const createRateLimiter = (options) => {
@@ -61,7 +57,6 @@ const createRateLimiter = (options) => {
     message: options.message,
     standardHeaders: true,
     legacyHeaders: false,
-    // FIXED: Don't skip in development - test rate limits everywhere
     skip: (req) => false,
     handler: (req, res) => {
       logger.warn(options.logMessage || "Rate limit exceeded", {
@@ -73,7 +68,6 @@ const createRateLimiter = (options) => {
     },
   };
 
-  // Use Redis store if available
   if (useRedis && redisClient) {
     config.store = new RedisStore({
       client: redisClient,
@@ -89,7 +83,7 @@ const createRateLimiter = (options) => {
 };
 
 // ============================================================================
-// PREDICTION RATE LIMITER (50 requests / 15 minutes)
+// RATE LIMITERS
 // ============================================================================
 
 const predictionLimiter = createRateLimiter({
@@ -103,10 +97,6 @@ const predictionLimiter = createRateLimiter({
   logMessage: "Prediction rate limit exceeded",
 });
 
-// ============================================================================
-// AUTH RATE LIMITER (10 requests / 15 minutes)
-// ============================================================================
-
 const authLimiter = createRateLimiter({
   windowMs: constants.AUTH_RATE_WINDOW_MS,
   max: constants.AUTH_RATE_MAX,
@@ -118,13 +108,8 @@ const authLimiter = createRateLimiter({
   logMessage: "Auth rate limit exceeded",
 });
 
-// ============================================================================
-// NEW: REFRESH TOKEN LIMITER (5 requests / 1 minute)
-// CRITICAL FIX: Prevents token refresh flooding
-// ============================================================================
-
 const refreshLimiter = createRateLimiter({
-  windowMs: 60000, 
+  windowMs: 60000,
   max: 5,
   prefix: "rl:refresh:",
   message: formatErrorResponse(
@@ -134,13 +119,8 @@ const refreshLimiter = createRateLimiter({
   logMessage: "Refresh token rate limit exceeded",
 });
 
-// ============================================================================
-// NEW: HISTORY LIMITER (100 requests / 1 minute)
-// FIX: Prevents session/prediction enumeration attacks
-// ============================================================================
-
 const historyLimiter = createRateLimiter({
-  windowMs: 60000, // 1 minute
+  windowMs: 60000,
   max: 100,
   prefix: "rl:history:",
   message: formatErrorResponse(
@@ -150,13 +130,8 @@ const historyLimiter = createRateLimiter({
   logMessage: "History rate limit exceeded",
 });
 
-// ============================================================================
-// NEW: HEALTH CHECK LIMITER (30 requests / 1 minute)
-// FIX: Prevents health check DDoS
-// ============================================================================
-
 const healthLimiter = createRateLimiter({
-  windowMs: 60000, // 1 minute
+  windowMs: 60000,
   max: 30,
   prefix: "rl:health:",
   message: formatErrorResponse(
@@ -166,13 +141,8 @@ const healthLimiter = createRateLimiter({
   logMessage: "Health check rate limit exceeded",
 });
 
-// ============================================================================
-// NEW: GLOBAL API LIMITER (1000 requests / 15 minutes)
-// FIX: Prevents general API abuse
-// ============================================================================
-
 const globalLimiter = createRateLimiter({
-  windowMs: 900000, // 15 minutes
+  windowMs: 900000,
   max: 1000,
   prefix: "rl:global:",
   message: formatErrorResponse(
@@ -180,6 +150,18 @@ const globalLimiter = createRateLimiter({
     "GLOBAL_RATE_LIMIT_EXCEEDED"
   ),
   logMessage: "Global rate limit exceeded",
+});
+
+const guestLimiter = createRateLimiter({
+  windowMs: 3600000,
+  max: 10,
+  prefix: "rl:guest:",
+  message: formatErrorResponse(
+    "Too many prediction requests from this IP. Please try again later.",
+    "GUEST_RATE_LIMIT_EXCEEDED"
+  ),
+  logMessage: "Guest rate limit exceeded",
+  keyGenerator: (req) => req.ip || req.connection.remoteAddress || "unknown",
 });
 
 // ============================================================================
@@ -200,31 +182,54 @@ const cleanup = async () => {
 };
 
 // ============================================================================
-// CRITICAL FIX: IP-based rate limiting for unauthenticated users
+// STATUS AND MONITORING FUNCTIONS
 // ============================================================================
 
-const guestLimiter = createRateLimiter({
-  windowMs: constants.GUEST_RATE_WINDOW_MS, // 1 hour
-  max: constants.GUEST_RATE_MAX, // 10 requests
-  prefix: "rl:guest:",
-  message: formatErrorResponse(
-    "Too many prediction requests from this IP. Please try again later.",
-    "GUEST_RATE_LIMIT_EXCEEDED"
-  ),
-  logMessage: "Guest rate limit exceeded",
-  // CRITICAL: Use IP address as key for guests
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || "unknown";
-  },
-});
+const getRedisStatus = () => {
+  return {
+    connected: useRedis,
+    host: process.env.REDIS_HOST || null,
+    port: process.env.REDIS_PORT || null,
+    clientReady: redisClient ? redisClient.status === "ready" : false,
+    storageType: useRedis ? "redis" : "memory",
+  };
+};
+
+const testRedisConnection = async () => {
+  if (!redisClient) {
+    return {
+      success: false,
+      message: "Redis client not initialized",
+      storageType: "memory",
+    };
+  }
+
+  try {
+    await redisClient.ping();
+    return {
+      success: true,
+      message: "Redis connection successful",
+      status: redisClient.status,
+      storageType: "redis",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Redis connection failed: ${error.message}`,
+      storageType: "memory",
+    };
+  }
+};
 
 module.exports = {
   predictionLimiter,
   authLimiter,
-  refreshLimiter, // NEW
-  historyLimiter, // NEW
-  healthLimiter, // NEW
-  globalLimiter, // NEW
+  refreshLimiter,
+  historyLimiter,
+  healthLimiter,
+  globalLimiter,
   guestLimiter,
   cleanup,
+  getRedisStatus,
+  testRedisConnection,
 };

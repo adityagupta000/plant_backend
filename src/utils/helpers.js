@@ -54,10 +54,12 @@ const getConfidenceLevel = (confidence) => {
 
 /**
  * Parse category and subtype from predicted class
- * @param {String} predictedClass - Class name (e.g., "Pest_Fungal")
+ * UPDATED: Added Not_Plant support
+ * @param {String} predictedClass - Class name (e.g., "Pest_Fungal", "Not_Plant")
  * @returns {Object} { category, subtype }
  */
 const parsePredictedClass = (predictedClass) => {
+  // Handle Healthy case
   if (predictedClass === "Healthy") {
     return {
       category: "Healthy",
@@ -65,6 +67,15 @@ const parsePredictedClass = (predictedClass) => {
     };
   }
 
+  // Handle Not_Plant case (NEW)
+  if (predictedClass === "Not_Plant") {
+    return {
+      category: "Invalid Input",
+      subtype: null,
+    };
+  }
+
+  // Handle other cases with underscore splitting
   const parts = predictedClass.split("_");
   return {
     category: parts[0] || null,

@@ -1,6 +1,6 @@
 /**
- * Storage Service
- * Manages file storage and cleanup
+ * Storage Service - FIXED
+ * Manages file storage with proper timeout tracking
  */
 
 const fs = require("fs").promises;
@@ -9,10 +9,13 @@ const constants = require("../config/constants");
 const logger = require("../utils/logger");
 
 class StorageService {
+  constructor() {
+    // CRITICAL FIX: Track pending cleanups
+    this.pendingCleanups = new Set();
+  }
+
   /**
    * Save image metadata
-   * @param {Object} file - Multer file object
-   * @returns {Object} Image metadata
    */
   saveImageMetadata(file) {
     return {
@@ -25,8 +28,7 @@ class StorageService {
   }
 
   /**
-   * Cleanup temporary file
-   * @param {String} filePath - Path to file
+   * CRITICAL FIX: Cleanup with timeout tracking
    */
   async cleanupTempFile(filePath) {
     if (!constants.TEMP_FILE_CLEANUP) {
@@ -35,18 +37,27 @@ class StorageService {
     }
 
     try {
-      // Wait before cleanup to allow AI service to process
-      setTimeout(async () => {
+      // CRITICAL FIX: Use a tracked timeout
+      const timeoutId = setTimeout(async () => {
         try {
           await fs.unlink(filePath);
           logger.debug("Temp file cleaned up", { filePath });
         } catch (error) {
-          logger.error("Error cleaning up temp file", {
-            error: error.message,
-            filePath,
-          });
+          // File might already be deleted
+          if (error.code !== "ENOENT") {
+            logger.error("Error cleaning up temp file", {
+              error: error.message,
+              filePath,
+            });
+          }
+        } finally {
+          // CRITICAL FIX: Remove from tracking set
+          this.pendingCleanups.delete(timeoutId);
         }
       }, constants.CLEANUP_DELAY_MS);
+
+      // CRITICAL FIX: Track the timeout
+      this.pendingCleanups.add(timeoutId);
     } catch (error) {
       logger.error("Error scheduling file cleanup", {
         error: error.message,
@@ -57,8 +68,6 @@ class StorageService {
 
   /**
    * Check if file exists
-   * @param {String} filePath - Path to file
-   * @returns {Boolean} File exists
    */
   async fileExists(filePath) {
     try {
@@ -71,8 +80,6 @@ class StorageService {
 
   /**
    * Get file size
-   * @param {String} filePath - Path to file
-   * @returns {Number} File size in bytes
    */
   async getFileSize(filePath) {
     try {
@@ -88,8 +95,7 @@ class StorageService {
   }
 
   /**
-   * Delete file immediately (for error cleanup)
-   * @param {String} filePath - Path to file
+   * Delete file immediately
    */
   async deleteFile(filePath) {
     try {
@@ -97,7 +103,30 @@ class StorageService {
       logger.debug("File deleted", { filePath });
       return true;
     } catch (error) {
-      logger.error("Error deleting file", {
+      if (error.code !== "ENOENT") {
+        logger.error("Error deleting file", {
+          error: error.message,
+          filePath,
+        });
+      }
+      return false;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Delete file synchronously (for cleanup in error handlers)
+   */
+  deleteFileSync(filePath) {
+    try {
+      const fs = require("fs");
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        logger.debug("File deleted synchronously", { filePath });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error("Error deleting file synchronously", {
         error: error.message,
         filePath,
       });
@@ -106,12 +135,122 @@ class StorageService {
   }
 
   /**
-   * Future: Upload to cloud storage (S3, Cloudinary, etc.)
-   * @param {String} filePath - Path to local file
-   * @returns {String} Cloud URL
+   * CRITICAL FIX: Cleanup all pending timeouts (on shutdown)
+   */
+  async cleanup() {
+    logger.info("Cleaning up pending file deletions", {
+      pending: this.pendingCleanups.size,
+    });
+
+    // Clear all pending timeouts
+    for (const timeoutId of this.pendingCleanups) {
+      clearTimeout(timeoutId);
+    }
+
+    this.pendingCleanups.clear();
+
+    logger.info("Storage service cleanup complete");
+  }
+
+  /**
+   * ENHANCEMENT: Get pending cleanup count
+   */
+  getPendingCleanupCount() {
+    return this.pendingCleanups.size;
+  }
+
+  /**
+   * ENHANCEMENT: Clean up old files from uploads directory
+   */
+  async cleanupOldFiles(maxAgeMs = 24 * 60 * 60 * 1000) {
+    try {
+      const uploadsDir = path.join(__dirname, "../../uploads");
+      const files = await fs.readdir(uploadsDir);
+      const now = Date.now();
+      let deletedCount = 0;
+
+      for (const file of files) {
+        const filePath = path.join(uploadsDir, file);
+
+        try {
+          const stats = await fs.stat(filePath);
+          const age = now - stats.mtimeMs;
+
+          if (age > maxAgeMs) {
+            await fs.unlink(filePath);
+            deletedCount++;
+            logger.debug("Deleted old file", { file, age });
+          }
+        } catch (error) {
+          logger.error("Error checking file age", {
+            file,
+            error: error.message,
+          });
+        }
+      }
+
+      logger.info("Old files cleanup complete", {
+        deletedCount,
+        maxAgeHours: maxAgeMs / (1000 * 60 * 60),
+      });
+
+      return deletedCount;
+    } catch (error) {
+      logger.error("Error cleaning up old files", {
+        error: error.message,
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Get storage statistics
+   */
+  async getStorageStats() {
+    try {
+      const uploadsDir = path.join(__dirname, "../../uploads");
+      const files = await fs.readdir(uploadsDir);
+      let totalSize = 0;
+      let fileCount = 0;
+
+      for (const file of files) {
+        try {
+          const filePath = path.join(uploadsDir, file);
+          const stats = await fs.stat(filePath);
+
+          if (stats.isFile()) {
+            totalSize += stats.size;
+            fileCount++;
+          }
+        } catch (error) {
+          // Skip files that can't be read
+        }
+      }
+
+      return {
+        fileCount,
+        totalSize,
+        totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
+        pendingCleanups: this.pendingCleanups.size,
+      };
+    } catch (error) {
+      logger.error("Error getting storage stats", {
+        error: error.message,
+      });
+      return {
+        fileCount: 0,
+        totalSize: 0,
+        totalSizeMB: "0.00",
+        pendingCleanups: this.pendingCleanups.size,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Future: Upload to cloud storage
    */
   async uploadToCloud(filePath) {
-    // Placeholder for cloud storage implementation
     logger.warn("Cloud upload not implemented", { filePath });
     throw new Error("Cloud storage not configured");
   }

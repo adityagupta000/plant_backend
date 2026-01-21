@@ -1,7 +1,6 @@
 /**
- * Token Service
- * Manages the complete lifecycle of access and refresh tokens
- * Core component of the dual token authentication system
+ * Token Service - FIXED
+ * Handles expired token revocation properly
  */
 
 const { RefreshToken } = require("../models");
@@ -11,6 +10,7 @@ const {
   generateRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
+  decodeToken, // CRITICAL: Import decode for expired tokens
   getExpirationSeconds,
 } = require("../utils/tokens");
 const jwtConfig = require("../config/jwt");
@@ -19,35 +19,26 @@ const logger = require("../utils/logger");
 class TokenService {
   /**
    * Generate both access and refresh tokens for a user
-   * @param {Object} user - User object
-   * @param {String} userAgent - User agent string
-   * @param {String} ipAddress - Client IP address
-   * @returns {Object} { accessToken, refreshToken, expiresIn }
    */
   async generateTokenPair(user, userAgent = null, ipAddress = null) {
     try {
-      // Generate unique token ID for refresh token
       const tokenId = generateTokenId();
 
-      // Generate access token
       const accessToken = generateAccessToken({
         userId: user.id,
         username: user.username,
       });
 
-      // Generate refresh token
       const refreshToken = generateRefreshToken({
         userId: user.id,
         tokenId: tokenId,
       });
 
-      // Calculate expiration date for refresh token
       const refreshExpiresIn = getExpirationSeconds(
-        jwtConfig.refresh.expiresIn
+        jwtConfig.refresh.expiresIn,
       );
       const expiresAt = new Date(Date.now() + refreshExpiresIn * 1000);
 
-      // Store refresh token metadata in database
       await RefreshToken.create({
         token_id: tokenId,
         user_id: user.id,
@@ -63,11 +54,10 @@ class TokenService {
         expiresAt,
       });
 
-      // Return both tokens
       return {
         accessToken,
         refreshToken,
-        expiresIn: getExpirationSeconds(jwtConfig.access.expiresIn), // seconds
+        expiresIn: getExpirationSeconds(jwtConfig.access.expiresIn),
       };
     } catch (error) {
       logger.error("Error generating token pair", {
@@ -80,8 +70,6 @@ class TokenService {
 
   /**
    * Validate access token
-   * @param {String} token - Access token to validate
-   * @returns {Object} Decoded token payload
    */
   async validateAccessToken(token) {
     try {
@@ -102,16 +90,12 @@ class TokenService {
   }
 
   /**
-   * Validate refresh token (checks JWT signature AND database revocation status)
-   * @param {String} token - Refresh token to validate
-   * @returns {Object} { valid, decoded, tokenRecord }
+   * Validate refresh token
    */
   async validateRefreshToken(token) {
     try {
-      // Verify JWT signature and expiration
       const decoded = verifyRefreshToken(token);
 
-      // Check if token exists in database and is not revoked
       const tokenRecord = await RefreshToken.findByTokenId(decoded.tokenId);
 
       if (!tokenRecord) {
@@ -123,7 +107,6 @@ class TokenService {
         throw error;
       }
 
-      // Check if token is valid (not expired and not revoked)
       if (!tokenRecord.isValid()) {
         if (tokenRecord.is_revoked) {
           logger.warn("Refresh token is revoked", {
@@ -164,23 +147,15 @@ class TokenService {
   }
 
   /**
-   * Refresh access token using refresh token
-   * @param {String} refreshToken - Refresh token
-   * @param {String} userAgent - User agent string
-   * @param {String} ipAddress - Client IP address
-   * @returns {Object} { accessToken, expiresIn }
+   * Refresh access token
    */
   async refreshAccessToken(refreshToken, userAgent = null, ipAddress = null) {
     try {
-      // Validate refresh token
-      const { decoded, tokenRecord } = await this.validateRefreshToken(
-        refreshToken
-      );
+      const { decoded, tokenRecord } =
+        await this.validateRefreshToken(refreshToken);
 
-      // Update last used timestamp
       await tokenRecord.updateLastUsed();
 
-      // Generate new access token
       const accessToken = generateAccessToken({
         userId: decoded.userId,
         username: decoded.username || tokenRecord.user?.username,
@@ -193,7 +168,7 @@ class TokenService {
 
       return {
         accessToken,
-        expiresIn: getExpirationSeconds(jwtConfig.access.expiresIn), // seconds
+        expiresIn: getExpirationSeconds(jwtConfig.access.expiresIn),
       };
     } catch (error) {
       logger.error("Error refreshing access token", {
@@ -205,17 +180,39 @@ class TokenService {
   }
 
   /**
-   * Revoke a specific refresh token
-   * @param {String} token - Refresh token to revoke
-   * @returns {Boolean} Success status
+   * CRITICAL FIX: Revoke refresh token (handles expired tokens)
    */
   async revokeRefreshToken(token) {
     try {
-      // Decode token to get token ID (don't verify, as it might be expired)
-      const decoded = verifyRefreshToken(token);
+      let decoded;
+      let tokenRecord;
+
+      // CRITICAL FIX: Try to verify token first
+      try {
+        decoded = verifyRefreshToken(token);
+      } catch (error) {
+        // If verification fails, try to decode without verification
+        // This allows us to revoke expired tokens
+        logger.warn(
+          "Token verification failed during revocation, attempting decode",
+          {
+            error: error.message,
+            code: error.code,
+          },
+        );
+
+        decoded = decodeToken(token);
+
+        if (!decoded || !decoded.tokenId) {
+          logger.warn("Cannot decode token for revocation", {
+            error: error.message,
+          });
+          return false;
+        }
+      }
 
       // Find token in database
-      const tokenRecord = await RefreshToken.findByTokenId(decoded.tokenId);
+      tokenRecord = await RefreshToken.findByTokenId(decoded.tokenId);
 
       if (!tokenRecord) {
         logger.warn("Token not found for revocation", {
@@ -224,28 +221,37 @@ class TokenService {
         return false;
       }
 
+      // Check if already revoked
+      if (tokenRecord.is_revoked) {
+        logger.info("Token already revoked", {
+          tokenId: decoded.tokenId,
+          userId: decoded.userId,
+        });
+        return true; // Consider this success
+      }
+
       // Revoke token
       await tokenRecord.revoke();
 
       logger.info("Refresh token revoked", {
         tokenId: decoded.tokenId,
         userId: decoded.userId,
+        wasExpired: new Date() > new Date(tokenRecord.expires_at),
       });
 
       return true;
     } catch (error) {
-      // If token is invalid or expired, try to find and revoke anyway
-      logger.warn("Error revoking refresh token, attempting fallback", {
+      logger.error("Error revoking refresh token", {
         error: error.message,
+        stack: error.stack,
       });
+      // Return false instead of throwing to allow graceful degradation
       return false;
     }
   }
 
   /**
-   * Revoke all refresh tokens for a user (logout from all devices)
-   * @param {Number} userId - User ID
-   * @returns {Number} Count of revoked tokens
+   * Revoke all refresh tokens for a user
    */
   async revokeAllUserTokens(userId) {
     try {
@@ -267,8 +273,7 @@ class TokenService {
   }
 
   /**
-   * Clean up expired tokens (should be run periodically)
-   * @returns {Number} Count of deleted tokens
+   * Clean up expired tokens
    */
   async cleanupExpiredTokens() {
     try {
@@ -288,9 +293,7 @@ class TokenService {
   }
 
   /**
-   * Get active session count for a user
-   * @param {Number} userId - User ID
-   * @returns {Number} Count of active sessions
+   * Get active session count
    */
   async getActiveSessionCount(userId) {
     try {
@@ -299,6 +302,67 @@ class TokenService {
     } catch (error) {
       logger.error("Error getting active session count", {
         error: error.message,
+        userId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Get all active sessions with details
+   */
+  async getActiveSessions(userId) {
+    try {
+      const sessions = await RefreshToken.findValidTokensForUser(userId);
+
+      return sessions.map((session) => ({
+        id: session.id,
+        createdAt: session.created_at,
+        lastUsedAt: session.last_used_at,
+        expiresAt: session.expires_at,
+        userAgent: session.user_agent,
+        ipAddress: session.ip_address,
+        isCurrent: false, // Can be set by comparing with current token
+      }));
+    } catch (error) {
+      logger.error("Error getting active sessions", {
+        error: error.message,
+        userId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Revoke specific session by ID
+   */
+  async revokeSessionById(userId, sessionId) {
+    try {
+      const tokenRecord = await RefreshToken.findOne({
+        where: {
+          id: sessionId,
+          user_id: userId,
+        },
+      });
+
+      if (!tokenRecord) {
+        const error = new Error("Session not found");
+        error.code = "SESSION_NOT_FOUND";
+        throw error;
+      }
+
+      await tokenRecord.revoke();
+
+      logger.info("Session revoked by ID", {
+        sessionId,
+        userId,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("Error revoking session by ID", {
+        error: error.message,
+        sessionId,
         userId,
       });
       throw error;

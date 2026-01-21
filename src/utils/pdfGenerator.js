@@ -446,6 +446,7 @@ class PDFReportGenerator {
   /**
    * Get color based on diagnosis
    */
+
   _getStatusColor(predictedClass) {
     if (predictedClass === "Healthy") {
       return "#27ae60"; // Green
@@ -453,6 +454,9 @@ class PDFReportGenerator {
       return "#e74c3c"; // Red
     } else if (predictedClass.startsWith("Nutrient_")) {
       return "#f39c12"; // Orange
+    } else if (predictedClass === "Not_Plant") {
+      // ADD THIS
+      return "#95a5a6"; // Gray
     } else {
       return "#3498db"; // Blue
     }

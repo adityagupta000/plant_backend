@@ -3,6 +3,7 @@ require("dotenv").config();
 const app = require("./app");
 const { testConnection, syncDatabase, closeConnection } = require("./models");
 const aiService = require("./services/ai.service");
+const storageService = require("./services/storage.service"); // CRITICAL FIX: Import storage service
 const logger = require("./utils/logger");
 const fs = require("fs").promises;
 const path = require("path");
@@ -16,57 +17,71 @@ let isShuttingDown = false;
 let isSyncingDatabase = false;
 
 /**
- * Database sync with lock file protection
+ * Database sync with atomic lock file protection
  */
 const syncDatabaseWithLock = async (options = {}) => {
   const lockFile = path.join(__dirname, "../.db-sync.lock");
+  let lockFd = null;
 
   try {
     try {
-      const lockStats = await fs.stat(lockFile);
-      const lockAge = Date.now() - lockStats.mtimeMs;
+      lockFd = await fs.open(lockFile, "wx");
+      await lockFd.writeFile(
+        JSON.stringify({
+          pid: process.pid,
+          timestamp: Date.now(),
+        }),
+      );
+    } catch (error) {
+      if (error.code === "EEXIST") {
+        const lockStats = await fs.stat(lockFile);
+        const lockAge = Date.now() - lockStats.mtimeMs;
 
-      if (lockAge < 30000) {
-        logger.warn("Database sync already in progress, waiting...");
+        if (lockAge < 30000) {
+          logger.warn("Database sync already in progress, waiting...");
 
-        for (let i = 0; i < 20; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          try {
-            await fs.stat(lockFile);
-          } catch {
-            break;
+          for (let i = 0; i < 60; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            try {
+              await fs.access(lockFile);
+            } catch {
+              return await syncDatabaseWithLock(options);
+            }
           }
-        }
-      } else {
-        logger.warn("Stale lock file detected, removing...");
-        await fs.unlink(lockFile);
-      }
-    } catch {
-      // Lock file doesn't exist
-    }
 
-    await fs.writeFile(
-      lockFile,
-      JSON.stringify({
-        pid: process.pid,
-        timestamp: Date.now(),
-      })
-    );
+          throw new Error("Database sync timeout - lock not released");
+        } else {
+          logger.warn("Stale lock file detected, removing...");
+          await fs.unlink(lockFile);
+          return await syncDatabaseWithLock(options);
+        }
+      }
+      throw error;
+    }
 
     isSyncingDatabase = true;
     await syncDatabase(options);
-    await fs.unlink(lockFile);
+
+    logger.info("Database synchronized successfully");
+    return true;
+  } finally {
     isSyncingDatabase = false;
 
-    return true;
-  } catch (error) {
-    isSyncingDatabase = false;
+    if (lockFd) {
+      try {
+        await lockFd.close();
+      } catch (e) {
+        logger.error("Error closing lock file", { error: e.message });
+      }
+    }
 
     try {
       await fs.unlink(lockFile);
-    } catch {}
-
-    throw error;
+    } catch (e) {
+      if (e.code !== "ENOENT") {
+        logger.error("Error removing lock file", { error: e.message });
+      }
+    }
   }
 };
 
@@ -91,7 +106,7 @@ const startServer = async () => {
       alter: NODE_ENV === "development",
     });
 
-    // FIXED: Initialize AI service with worker pool
+    // Initialize AI service
     logger.info("Initializing AI worker pool...");
     try {
       await aiService.initialize();
@@ -142,7 +157,7 @@ const startServer = async () => {
 };
 
 /**
- * Graceful shutdown
+ * CRITICAL FIX: Enhanced graceful shutdown
  */
 const gracefulShutdown = async (signal) => {
   if (isShuttingDown) {
@@ -158,7 +173,11 @@ const gracefulShutdown = async (signal) => {
       logger.info("HTTP server closed");
 
       try {
-        // FIXED: Cleanup AI worker pool
+        // CRITICAL FIX: Cleanup storage service timeouts
+        logger.info("Cleaning up storage service...");
+        await storageService.cleanup();
+
+        // Cleanup AI worker pool
         logger.info("Cleaning up AI worker pool...");
         await aiService.cleanup();
 
@@ -175,11 +194,21 @@ const gracefulShutdown = async (signal) => {
           } catch {}
         }
 
-        // FIXED: Cleanup rate limiter Redis connection
+        // Cleanup rate limiter Redis connection
         const rateLimiter = require("./middlewares/rateLimiter.middleware");
         if (rateLimiter.cleanup) {
           await rateLimiter.cleanup();
         }
+
+        // Cleanup guest limiter Redis connection
+        const guestLimiter = require("./middlewares/guestRateLimiter.middleware");
+        if (guestLimiter.cleanup) {
+          await guestLimiter.cleanup();
+        }
+
+        // ENHANCEMENT: Log final statistics
+        const storageStats = await storageService.getStorageStats();
+        logger.info("Final storage statistics", storageStats);
 
         logger.info("Graceful shutdown complete");
         process.exit(0);
@@ -228,6 +257,24 @@ process.on("unhandledRejection", (reason, promise) => {
  */
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+// ENHANCEMENT: Periodic cleanup of old files (every 6 hours)
+if (NODE_ENV === "production") {
+  setInterval(
+    async () => {
+      try {
+        logger.info("Running periodic file cleanup...");
+        const deleted = await storageService.cleanupOldFiles(
+          24 * 60 * 60 * 1000,
+        ); // 24 hours
+        logger.info(`Periodic cleanup completed: ${deleted} files deleted`);
+      } catch (error) {
+        logger.error("Periodic cleanup failed", { error: error.message });
+      }
+    },
+    6 * 60 * 60 * 1000,
+  ); // Every 6 hours
+}
 
 // Start the server
 startServer();

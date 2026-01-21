@@ -1,6 +1,6 @@
 /**
- * Authentication Controller
- * Handles HTTP requests for authentication endpoints
+ * Authentication Controller - ENHANCED
+ * Added session management endpoints
  */
 
 const authService = require("../services/auth.service");
@@ -23,7 +23,6 @@ class AuthController {
     try {
       const { username, email, password } = req.body;
 
-      // Register user
       const user = await authService.register(username, email, password);
 
       logger.info("User registration successful", {
@@ -36,8 +35,8 @@ class AuthController {
           {
             user,
           },
-          "Registration successful"
-        )
+          "Registration successful",
+        ),
       );
     } catch (error) {
       next(error);
@@ -54,11 +53,9 @@ class AuthController {
       const userAgent = getUserAgent(req);
       const ipAddress = getClientIp(req);
 
-      // Login user
       const { accessToken, refreshToken, user, expiresIn } =
         await authService.login(email, password, userAgent, ipAddress);
 
-      // Set refresh token as HTTP-only cookie
       res.cookie(jwtConfig.cookie.name, refreshToken, {
         httpOnly: jwtConfig.cookie.httpOnly,
         secure: jwtConfig.cookie.secure,
@@ -72,7 +69,6 @@ class AuthController {
         ipAddress,
       });
 
-      // Return access token in response body
       res.status(200).json(
         formatSuccessResponse(
           {
@@ -80,8 +76,8 @@ class AuthController {
             expiresIn,
             user,
           },
-          "Login successful"
-        )
+          "Login successful",
+        ),
       );
     } catch (error) {
       next(error);
@@ -94,7 +90,6 @@ class AuthController {
    */
   async refreshToken(req, res, next) {
     try {
-      // Extract refresh token from cookie
       const refreshToken = req.cookies[jwtConfig.cookie.name];
 
       if (!refreshToken) {
@@ -104,19 +99,18 @@ class AuthController {
           .json(
             formatErrorResponse(
               "Refresh token required",
-              "REFRESH_TOKEN_REQUIRED"
-            )
+              "REFRESH_TOKEN_REQUIRED",
+            ),
           );
       }
 
       const userAgent = getUserAgent(req);
       const ipAddress = getClientIp(req);
 
-      // Refresh access token
       const { accessToken, expiresIn } = await tokenService.refreshAccessToken(
         refreshToken,
         userAgent,
-        ipAddress
+        ipAddress,
       );
 
       logger.info("Access token refreshed", { ipAddress });
@@ -125,10 +119,9 @@ class AuthController {
         formatSuccessResponse({
           accessToken,
           expiresIn,
-        })
+        }),
       );
     } catch (error) {
-      // Clear cookie if refresh token is invalid
       res.clearCookie(jwtConfig.cookie.name, {
         httpOnly: jwtConfig.cookie.httpOnly,
         secure: jwtConfig.cookie.secure,
@@ -145,15 +138,12 @@ class AuthController {
    */
   async logout(req, res, next) {
     try {
-      // Extract refresh token from cookie
       const refreshToken = req.cookies[jwtConfig.cookie.name];
 
       if (refreshToken) {
-        // Revoke refresh token
         await authService.logout(refreshToken);
       }
 
-      // Clear refresh token cookie
       res.clearCookie(jwtConfig.cookie.name, {
         httpOnly: jwtConfig.cookie.httpOnly,
         secure: jwtConfig.cookie.secure,
@@ -178,10 +168,8 @@ class AuthController {
     try {
       const userId = req.userId;
 
-      // Revoke all refresh tokens
       const revokedCount = await authService.logoutAll(userId);
 
-      // Clear current refresh token cookie
       res.clearCookie(jwtConfig.cookie.name, {
         httpOnly: jwtConfig.cookie.httpOnly,
         secure: jwtConfig.cookie.secure,
@@ -198,8 +186,8 @@ class AuthController {
           {
             revokedSessions: revokedCount,
           },
-          "Logged out from all devices"
-        )
+          "Logged out from all devices",
+        ),
       );
     } catch (error) {
       next(error);
@@ -214,14 +202,89 @@ class AuthController {
     try {
       const userId = req.userId;
 
-      // Get user data
       const user = await authService.getUserById(userId);
 
       res.status(200).json(
         formatSuccessResponse({
           user,
-        })
+        }),
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Get all active sessions
+   * GET /api/auth/sessions
+   */
+  async getSessions(req, res, next) {
+    try {
+      const userId = req.userId;
+      const currentRefreshToken = req.cookies[jwtConfig.cookie.name];
+
+      const sessions = await tokenService.getActiveSessions(userId);
+
+      // Mark current session
+      if (currentRefreshToken) {
+        const jwt = require("jsonwebtoken");
+        try {
+          const decoded = jwt.decode(currentRefreshToken);
+          if (decoded && decoded.tokenId) {
+            sessions.forEach((session) => {
+              if (session.id === decoded.tokenId) {
+                session.isCurrent = true;
+              }
+            });
+          }
+        } catch (error) {
+          // Ignore decode errors
+        }
+      }
+
+      logger.info("Retrieved active sessions", {
+        userId,
+        sessionCount: sessions.length,
+      });
+
+      res.status(200).json(
+        formatSuccessResponse({
+          sessions,
+          total: sessions.length,
+        }),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Revoke specific session
+   * DELETE /api/auth/sessions/:sessionId
+   */
+  async revokeSession(req, res, next) {
+    try {
+      const userId = req.userId;
+      const sessionId = parseInt(req.params.sessionId);
+
+      if (isNaN(sessionId)) {
+        return res
+          .status(400)
+          .json(
+            formatErrorResponse("Invalid session ID", "INVALID_SESSION_ID"),
+          );
+      }
+
+      await tokenService.revokeSessionById(userId, sessionId);
+
+      logger.info("Session revoked", {
+        userId,
+        sessionId,
+      });
+
+      res
+        .status(200)
+        .json(formatSuccessResponse({}, "Session revoked successfully"));
     } catch (error) {
       next(error);
     }

@@ -199,7 +199,7 @@ class AIWorker extends EventEmitter {
                   {
                     success: result.success,
                     hasData: !!result.data,
-                  }
+                  },
                 );
                 // Return the result AS-IS from Python
                 cleanup(null, result);
@@ -209,7 +209,7 @@ class AIWorker extends EventEmitter {
                 `Worker ${this.workerId} JSON parse error (may be incomplete)`,
                 {
                   error: error.message,
-                }
+                },
               );
             }
           }
@@ -232,8 +232,8 @@ class AIWorker extends EventEmitter {
       const onExit = (code, signal) => {
         cleanup(
           new Error(
-            `Worker died during prediction (code: ${code}, signal: ${signal})`
-          )
+            `Worker died during prediction (code: ${code}, signal: ${signal})`,
+          ),
         );
       };
 
@@ -258,7 +258,7 @@ class AIWorker extends EventEmitter {
         }
       } catch (error) {
         cleanup(
-          new Error(`Failed to send request to worker: ${error.message}`)
+          new Error(`Failed to send request to worker: ${error.message}`),
         );
         return;
       }
@@ -271,8 +271,8 @@ class AIWorker extends EventEmitter {
       const timeoutId = setTimeout(() => {
         cleanup(
           new Error(
-            `Worker ${this.workerId} prediction timeout (${actualTimeout}ms)`
-          )
+            `Worker ${this.workerId} prediction timeout (${actualTimeout}ms)`,
+          ),
         );
       }, actualTimeout);
     });
@@ -384,11 +384,7 @@ class AIWorkerPool {
           this.handleWorkerExit(worker);
         });
 
-        await worker.start(
-          this.pythonPath,
-          this.scriptPath,
-          this.modelPath
-        );
+        await worker.start(this.pythonPath, this.scriptPath, this.modelPath);
         this.workers[i] = worker;
 
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -412,15 +408,11 @@ class AIWorkerPool {
     this.stats.workerRestarts++;
 
     try {
-      await worker.start(
-        this.pythonPath,
-        this.scriptPath,
-        this.modelPath
-      );
+      await worker.start(this.pythonPath, this.scriptPath, this.modelPath);
       logger.info(`Worker ${worker.workerId} restarted successfully`);
     } catch (error) {
       logger.error(
-        `Failed to restart worker ${worker.workerId}: ${error.message}`
+        `Failed to restart worker ${worker.workerId}: ${error.message}`,
       );
     }
   }
@@ -428,18 +420,41 @@ class AIWorkerPool {
   async getAvailableWorker(timeout = 120000) {
     const startTime = Date.now();
     const checkInterval = 100;
+    const maxAttempts = Math.floor(timeout / checkInterval);
 
-    while (Date.now() - startTime < timeout) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       for (const worker of this.workers) {
         if (worker && worker.isReady && !worker.busy) {
-          return worker;
+          if (worker.isReady && !worker.busy) {
+            return worker;
+          }
         }
       }
 
       await new Promise((resolve) => setTimeout(resolve, checkInterval));
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed % 10000 < checkInterval) {
+        logger.debug(
+          `Waiting for available worker... (${Math.floor(elapsed / 1000)}s)`,
+          {
+            busyWorkers: this.workers.filter((w) => w && w.busy).length,
+            totalWorkers: this.workers.length,
+          },
+        );
+      }
     }
 
-    throw new Error("No available workers (timeout)");
+    const workerStates = this.workers.map((w) =>
+      w ? { id: w.workerId, ready: w.isReady, busy: w.busy } : null,
+    );
+
+    logger.error("No available workers after timeout", {
+      timeout,
+      workerStates,
+    });
+
+    throw new Error(`No available workers (timeout: ${timeout}ms)`);
   }
 
   async predict(imagePath, retryCount = 0) {
@@ -470,7 +485,7 @@ class AIWorkerPool {
 
       if (worker.shouldRestart()) {
         logger.warn(
-          `Worker ${worker.workerId} has too many failures, restarting`
+          `Worker ${worker.workerId} has too many failures, restarting`,
         );
         worker.kill();
       }
@@ -479,7 +494,6 @@ class AIWorkerPool {
       // Python already returns: {success: true, data: {...}}
       // Don't wrap it again!
       return result;
-      
     } catch (error) {
       this.stats.failedPredictions++;
 
@@ -488,10 +502,10 @@ class AIWorkerPool {
           `Prediction failed, retrying (${retryCount + 1}/${maxRetries})`,
           {
             error: error.message,
-          }
+          },
         );
         await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * (retryCount + 1))
+          setTimeout(resolve, 1000 * (retryCount + 1)),
         );
         return this.predict(imagePath, retryCount + 1);
       }
