@@ -1,23 +1,24 @@
 # ===============================
-# Core Deep Learning
+# Core Deep Learning (CPU ONLY)
 # ===============================
-torch>=2.0.0
-torchvision>=0.15.0
-timm>=0.9.12
+torch==2.1.2+cpu
+torchvision==0.16.2+cpu
+timm==1.0.24
 
 # ===============================
-# Image Processing
+# Image Processing (HEADLESS FOR DOCKER)
 # ===============================
-opencv-python>=4.8.0
-Pillow>=10.0.0
+opencv-python-headless==4.9.0.80
+Pillow==10.4.0
 
 # ===============================
 # Numerical & Utilities
 # ===============================
-numpy>=1.23.0
-PyYAML>=6.0
+numpy==1.26.4
+PyYAML==6.0.1
+scikit-learn==1.4.2
 
 # ===============================
-# Optional (safe & future-proof)
+# Security & Encryption
 # ===============================
-scikit-learn>=1.3.0
+cryptography==42.0.5

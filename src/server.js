@@ -1,11 +1,9 @@
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
+require("dotenv").config();
 
 const app = require("./app");
 const { testConnection, syncDatabase, closeConnection } = require("./models");
 const aiService = require("./services/ai.service");
-const storageService = require("./services/storage.service"); // CRITICAL FIX: Import storage service
+const storageService = require("./services/storage.service");
 const logger = require("./utils/logger");
 const fs = require("fs").promises;
 const path = require("path");
@@ -13,6 +11,11 @@ const path = require("path");
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || "localhost";
 const NODE_ENV = process.env.NODE_ENV || "development";
+
+if (!process.env.ACCESS_TOKEN_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
+  console.error("FATAL ERROR: JWT secrets not configured!");
+  process.exit(1);
+}
 
 let server;
 let isShuttingDown = false;
