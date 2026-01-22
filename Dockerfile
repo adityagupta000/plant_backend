@@ -36,6 +36,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ============================================================================
 FROM node:18-slim
 
+ENV NODE_ENV=production
+
 # Install Python runtime and system dependencies
 RUN apt-get update && apt-get install -y \
     python3.10 \
