@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Backend Application Service
+  # ============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: plant-health-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      # Server Configuration
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      HOST: 0.0.0.0
+      
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      
+      # Database (SQLite - file-based)
+      DB_PATH: /app/data/database.sqlite
+      DB_LOGGING: ${DB_LOGGING:-false}
+      
+      # JWT Secrets (CHANGE THESE IN PRODUCTION!)
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      ACCESS_TOKEN_EXPIRE: ${ACCESS_TOKEN_EXPIRE:-15m}
+      REFRESH_TOKEN_EXPIRE: ${REFRESH_TOKEN_EXPIRE:-7d}
+      
+      # Redis Configuration (Optional)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      
+      # AI Model Configuration
+      MODEL_PATH: /app/ai/saved_models/best_model.encrypted
+      MODEL_KEY_PATH: /app/ai/secrets/model.key
+      PYTHON_PATH: /usr/bin/python3
+      AI_WORKERS: ${AI_WORKERS:-4}
+      
+      # File Upload Configuration
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-5242880}
+      
+      # Guest Mode Configuration
+      GUEST_MODE_ENABLED: ${GUEST_MODE_ENABLED:-true}
+      GUEST_IP_LIMIT: ${GUEST_IP_LIMIT:-2}
+      GUEST_SESSION_LIMIT: ${GUEST_SESSION_LIMIT:-4}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      
+    volumes:
+      # Persistent data volumes
+      - ./data:/app/data                    # SQLite database
+      - ./uploads:/app/uploads              # User uploads
+      - ./logs:/app/logs                    # Application logs
+      - ./ai/saved_models:/app/ai/saved_models  # AI model (read-only)
+      - ./ai/secrets:/app/ai/secrets:ro     # Model encryption key (read-only)
+      
+    networks:
+      - app-network
+    
+    depends_on:
+      - redis
+    
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # Redis Service (Optional - for rate limiting)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: plant-health-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  app-network:
+    driver: bridge
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  redis-data:
+    driver: local

@@ -20,3 +20,17 @@ pdf.py
 .env.development
 .env
 secrets/
+
+.env
+.env.docker
+docker-compose.override.yml
+
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+uploads/*
+!uploads/.gitkeep
+logs/*.log
+
+!data/.gitkeep
+!logs/.gitkeep
