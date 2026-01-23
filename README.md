@@ -1,6 +1,6 @@
 # Plant Health Detection Backend (Dockerized)
 
-A **Node.js backend** integrated with a **Python AI inference service** and **Redis**, fully containerized using **Docker Compose**.  
+A **Node.js backend** integrated with a **Python AI inference service**, fully containerized using **Docker Compose**.  
 Optimized for **CPU-only environments** and designed with a **privacy-first architecture**.
 
 ---
@@ -156,7 +156,6 @@ Expected response:
 | -------------- | ----------------------------------- |
 | Backend        | Node.js REST API                    |
 | AI Workers     | Python inference workers (CPU-only) |
-| Redis          | Rate limiting & guest control       |
 | Docker Compose | Orchestrates all services           |
 
 ---
