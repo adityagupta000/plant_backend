@@ -1,375 +1,241 @@
-# Plant Health Detection Backend
+# Plant Health Detection Backend (Dockerized)
 
-Production-ready Node.js backend with dual token authentication for plant disease detection system.
+A production-ready **Node.js backend** integrated with a **Python AI inference service** and **Redis**, fully containerized using **Docker Compose**.  
+Optimized for **CPU-only environments** and designed with a **privacy-first architecture**.
 
-## 🌟 Features
+---
 
-- **Dual Token Authentication**: Access tokens (15min) + Refresh tokens (7 days)
-- **Session Management**: Claude-style conversation history
-- **AI Integration**: Communicates with Python FastAPI inference service
-- **File Upload**: Secure image upload with validation
-- **Rate Limiting**: Protect against abuse
-- **Comprehensive Logging**: Winston-based logging system
-- **Error Handling**: Centralized error management
-- **Database**: SQLite (dev) / PostgreSQL (prod)
+## Important Notice (READ FIRST)
 
-## 📋 Prerequisites
+This repository **does NOT include** the following files **by design**:
 
-- Node.js >= 16.0.0
-- npm >= 8.0.0
-- Python FastAPI service running (for AI predictions)
+* AI model files
+* Encryption keys
+* Environment secrets
 
-## 🚀 Quick Start
+These are **intentionally excluded** for:
 
-### 1. Installation
+* Security
+* IP protection
+* Privacy
+* Clean team collaboration
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd backend
+You **must download them separately** before running the backend.
 
-# Install dependencies
-npm install
+---
+
+## What Is NOT Included in GitHub
+
+The following paths are **ignored in Git** and must be provided externally:
+
+```
+ai/saved_models/
+ai/secrets/
+.env.docker
 ```
 
-### 2. Environment Setup
+### Missing Files (Required)
 
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Generate secure JWT secrets
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-
-# Edit .env file with your secrets
-nano .env
+```
+ai/
+├── saved_models/
+│   └── best_model.encrypted
+├── secrets/
+│   └── model.key
+.env.docker
 ```
 
-**CRITICAL**: Update these values in `.env`:
-- `ACCESS_TOKEN_SECRET` - Generate a strong random secret
-- `REFRESH_TOKEN_SECRET` - Generate a DIFFERENT strong random secret
-- `FRONTEND_URL` - Your frontend URL (for CORS)
+These files are shared **securely via Drive** (Google Drive / OneDrive / internal storage).
 
-### 3. Create Required Directories
+---
 
-```bash
-# Create directories
-mkdir -p uploads logs
+## Step 1: Clone the Repository
 
-# Add .gitkeep to uploads folder
-touch uploads/.gitkeep
-```
-
-### 4. Start the Server
+First, clone this repository to your local machine:
 
 ```bash
-# Development mode (with auto-reload)
-npm run dev
-
-# Production mode
-npm start
+git clone https://github.com/<org-or-username>/plant-health-backend.git
+cd plant-health-backend
 ```
 
-Server will start at `http://localhost:3000`
+---
 
-## 📁 Project Structure
+## Step 2: Download Required Files from Drive
+
+Download the shared **AI bundle** from Drive.  
+You will receive a folder structured like this:
+
+```
+plant-health-ai/
+├── saved_models/
+│   └── best_model.encrypted
+├── secrets/
+│   └── model.key
+└── .env.docker
+```
+
+---
+
+## Step 3: Place Files into the Project
+
+Now **copy the downloaded files into your cloned repository** like this:
 
 ```
 backend/
-├── src/
-│   ├── config/           # Configuration files
-│   │   ├── database.js
-│   │   ├── jwt.js
-│   │   └── constants.js
-│   ├── controllers/      # Request handlers
-│   │   ├── auth.controller.js
-│   │   ├── prediction.controller.js
-│   │   └── history.controller.js
-│   ├── middlewares/      # Express middleware
-│   │   ├── auth.middleware.js
-│   │   ├── validation.middleware.js
-│   │   ├── rateLimiter.middleware.js
-│   │   └── error.middleware.js
-│   ├── models/           # Database models
-│   │   ├── index.js
-│   │   ├── user.model.js
-│   │   ├── refreshToken.model.js
-│   │   ├── session.model.js
-│   │   └── prediction.model.js
-│   ├── routes/           # API routes
-│   │   ├── auth.routes.js
-│   │   ├── prediction.routes.js
-│   │   └── history.routes.js
-│   ├── services/         # Business logic
-│   │   ├── auth.service.js
-│   │   ├── token.service.js
-│   │   ├── ai.service.js
-│   │   ├── storage.service.js
-│   │   └── prediction.service.js
-│   ├── utils/            # Utility functions
-│   │   ├── logger.js
-│   │   ├── tokens.js
-│   │   ├── helpers.js
-│   │   └── upload.js
-│   ├── app.js            # Express app setup
-│   └── server.js         # Server entry point
-├── uploads/              # Temporary image storage
-├── logs/                 # Application logs
-├── .env                  # Environment variables
-├── .env.example          # Environment template
-├── .gitignore            # Git ignore rules
-├── package.json          # Dependencies
-└── README.md             # Documentation
+├── ai/
+│   ├── saved_models/
+│   │   └── best_model.encrypted   ← from Drive
+│   ├── secrets/
+│   │   └── model.key              ← from Drive
+│   └── inference_server.py
+├── .env.docker                    ← from Drive
+├── docker-compose.yml
+├── Dockerfile
+└── src/
 ```
 
-## 🔐 Authentication Flow
+⚠️ **Do NOT rename folders**  
+⚠️ **Do NOT change file paths**
 
-### Dual Token System
+---
 
-1. **Access Token** (Short-lived - 15 minutes)
-   - Stored in client memory
-   - Used for API requests
-   - Sent in Authorization header
+## Quick Start (Docker)
 
-2. **Refresh Token** (Long-lived - 7 days)
-   - Stored in HTTP-only cookie
-   - Used to obtain new access tokens
-   - Cannot be accessed by JavaScript
+### 1. Clone the repository
 
-### Login Flow
+```bash
+git clone https://github.com/<org-or-username>/plant-health-backend.git
+cd plant-health-backend
+```
 
-```javascript
-// 1. User logs in
-POST /api/auth/login
-Body: { email, password }
+### 2. Download AI bundle from Drive
 
-// 2. Server responds with access token
-Response: {
-  accessToken: "...",
-  expiresIn: 900,
-  user: {...}
-}
-// + Sets refresh token in HTTP-only cookie
+Get the shared files and place them in the correct locations (see steps above).
 
-// 3. Client stores access token in memory
-let accessToken = response.accessToken;
+### 3. Verify required files are in place
 
-// 4. Client makes API requests
-GET /api/predict/health
-Headers: { Authorization: "Bearer <accessToken>" }
+Check that all files are correctly placed:
 
-// 5. When access token expires
-POST /api/auth/refresh
-// Server automatically reads refresh token from cookie
+```bash
+ls ai/saved_models
+ls ai/secrets
+ls .env.docker
+```
 
-// 6. Server responds with new access token
-Response: {
-  accessToken: "...",
-  expiresIn: 900
+### 4. Start the backend
+
+```bash
+docker compose up --build
+```
+
+---
+
+## Verify Backend Is Running
+
+### Health check
+
+```bash
+curl http://localhost:5000/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "plant-health-backend",
+  "environment": "development"
 }
 ```
 
-## 📡 API Endpoints
+---
 
-### Authentication
+## Services Included
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| POST | `/api/auth/register` | Register new user | Public |
-| POST | `/api/auth/login` | Login user | Public |
-| POST | `/api/auth/refresh` | Refresh access token | Public* |
-| POST | `/api/auth/logout` | Logout current session | Private |
-| POST | `/api/auth/logout-all` | Logout all sessions | Private |
-| GET | `/api/auth/profile` | Get user profile | Private |
+| Service        | Description                         |
+| -------------- | ----------------------------------- |
+| Backend        | Node.js REST API                    |
+| AI Workers     | Python inference workers (CPU-only) |
+| Redis          | Rate limiting & guest control       |
+| Docker Compose | Orchestrates all services           |
 
-*Requires refresh token in cookie
+---
 
-### Predictions
+## Project Structure (Simplified)
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| GET | `/api/predict/health` | Check AI service health | Private |
-| POST | `/api/predict/session` | Create new session | Private |
-| POST | `/api/predict` | Make prediction | Private |
+```
+backend/
+├── ai/                     # Python AI service
+│   ├── inference_server.py
+│   ├── requirements.txt
+│   ├── saved_models/        # ⛔ provided via Drive
+│   └── secrets/             # ⛔ provided via Drive
+├── src/                     # Node.js backend
+├── docker-compose.yml
+├── Dockerfile
+├── .env.docker              # ⛔ provided via Drive
+└── README.md
+```
 
-### History
+---
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| GET | `/api/history/sessions` | Get all sessions | Private |
-| GET | `/api/history/sessions/:id/predictions` | Get session predictions | Private |
-| PATCH | `/api/history/sessions/:id` | Update session title | Private |
-| DELETE | `/api/history/sessions/:id` | Delete session | Private |
-| GET | `/api/history/predictions/:id` | Get prediction details | Private |
+## Why Model & Secrets Are Excluded
 
-## 🧪 Testing
+* Prevents accidental public exposure
+* Protects trained model IP
+* Keeps encryption keys secure
+* Allows different environments to use different models
+* Follows industry best practices
 
-### Using cURL
+**Docker images = code**  
+**Volumes / local files = data & secrets**
+
+---
+
+## Common Commands
+
+### Start
 
 ```bash
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
-
-# Login (save cookies)
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}' \
-  -c cookies.txt
-
-# Make prediction (with saved cookies)
-curl -X POST http://localhost:3000/api/predict \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -F "image=@/path/to/image.jpg" \
-  -b cookies.txt
-
-# Refresh token (uses cookies automatically)
-curl -X POST http://localhost:3000/api/auth/refresh \
-  -b cookies.txt \
-  -c cookies.txt
-
-# Logout
-curl -X POST http://localhost:3000/api/auth/logout \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -b cookies.txt
+docker compose up
 ```
 
-### Using Postman
-
-1. **Register/Login**: Save the `accessToken` from response
-2. **Set Authorization**: Use "Bearer Token" with saved `accessToken`
-3. **Enable Cookies**: Settings → Enable "Interceptor" for cookie handling
-4. **Make Requests**: Cookies are sent automatically
-
-## 🔒 Security Features
-
-- **Password Hashing**: bcrypt with 10 rounds
-- **JWT Tokens**: HS256 algorithm
-- **HTTP-Only Cookies**: XSS protection
-- **SameSite Cookies**: CSRF protection
-- **Rate Limiting**: Prevent brute force attacks
-- **Input Validation**: Joi schemas
-- **File Validation**: Type and size checking
-- **Helmet**: Security headers
-
-## 📊 Database Schema
-
-### Users
-- id, username, email, password_hash, is_active, created_at, updated_at
-
-### Refresh Tokens
-- id, token_id, user_id, expires_at, is_revoked, revoked_at, created_at, last_used_at, user_agent, ip_address
-
-### Prediction Sessions
-- id, user_id, title, created_at, updated_at
-
-### Predictions
-- id, session_id, user_id, image_name, image_url, image_size, predicted_class, category, subtype, confidence, confidence_percentage, all_predictions, confidence_level, explanation, model_version, model_name, processing_time_ms, status, error_message, created_at
-
-## 🐛 Troubleshooting
-
-### Port Already in Use
+### Stop
 
 ```bash
-# Find process using port 3000
-lsof -i :3000  # Mac/Linux
-netstat -ano | findstr :3000  # Windows
-
-# Kill process
-kill -9 <PID>  # Mac/Linux
-taskkill /PID <PID> /F  # Windows
+docker compose down
 ```
 
-### Database Locked
+### Restart
 
 ```bash
-# Delete SQLite database and restart
-rm database.sqlite
-npm run dev
+docker compose restart
 ```
 
-### AI Service Unavailable
-
-1. Check if Python service is running
-2. Verify `AI_SERVICE_URL` in `.env`
-3. Check AI service logs
-
-### CORS Issues
-
-1. Verify `FRONTEND_URL` in `.env`
-2. Ensure `credentials: true` in frontend fetch
-3. Check CORS middleware in `app.js`
-
-## 🚀 Production Deployment
-
-### Environment Setup
+### Logs
 
 ```bash
-NODE_ENV=production
-COOKIE_SECURE=true
-DB_DIALECT=postgres
-# ... update all production values
+docker compose logs -f backend
 ```
 
-### PostgreSQL Setup
+### Enter container
 
 ```bash
-# Install pg packages
-npm install pg pg-hstore
-
-# Update .env
-DB_DIALECT=postgres
-DB_HOST=your-db-host
-DB_PORT=5432
-DB_NAME=plant_health_prod
-DB_USER=your-db-user
-DB_PASSWORD=your-db-password
+docker compose exec backend sh
 ```
 
-### Using PM2
+---
+
+## Debugging Tips
+
+### Check AI availability
 
 ```bash
-# Install PM2
-npm install -g pm2
-
-# Start server
-pm2 start src/server.js --name plant-health-backend
-
-# View logs
-pm2 logs plant-health-backend
-
-# Monitor
-pm2 monit
-
-# Restart
-pm2 restart plant-health-backend
-
-# Stop
-pm2 stop plant-health-backend
+docker compose logs backend | grep "AI worker"
 ```
 
-### Docker (Optional)
+### Verify Python inside container
 
-```dockerfile
-FROM node:16-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
+```bash
+docker compose exec backend python -c "import cv2, torch; print('OK')"
 ```
-
-## 📝 Environment Variables Reference
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| NODE_ENV | Environment mode | development | No |
-| PORT | Server port | 3000 | No |
-| ACCESS_TOKEN_SECRET | JWT access token secret | - | **Yes** |
-| REFRESH_TOKEN_SECRET | JWT refresh token secret | - | **Yes** |
-| FRONTEND_URL | Frontend URL for CORS | http://localhost:5173 | No |
-| AI_SERVICE_URL | Python AI service URL | http://localhost:8000 | No |
-
-See `.env.example` for complete list.
