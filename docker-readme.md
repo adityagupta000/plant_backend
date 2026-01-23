@@ -8,9 +8,9 @@ A containerized Node.js backend with Python AI service and Redis, optimized for 
 
 ```bash
 # 1. Clone and configure
-git clone <your-repo-url>
-cd backend
-cp .env.example .env.docker
+git clone -b backend-docker --single-branch https://github.com/adityagupta000/plant_backend.git
+cd plant_backend
+cp .env.docker
 # Edit .env.docker with your configuration
 
 # 2. Build and start services
