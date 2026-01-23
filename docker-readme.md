@@ -395,22 +395,3 @@ tar -czf backup/uploads-$(date +%Y%m%d).tar.gz ./uploads/
 3. **Check disk space:** `df -h` and `docker system df`
 4. **Rebuild from scratch:** `docker compose down -v && docker compose up --build -d`
 5. **Clear Docker cache:** `docker system prune -a --volumes` (warning: deletes all unused data)
-
----
-
-## Additional Resources
-
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
-- [PyTorch CPU Installation](https://pytorch.org/get-started/locally/)
-- [Redis Docker Guide](https://redis.io/docs/install/install-stack/docker/)
-
----
-
-## License
-
-[Your License Here]
-
-## Contributing
-
-[Your Contributing Guidelines Here]
