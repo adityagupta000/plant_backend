@@ -54,8 +54,8 @@ These files are shared **securely via Drive** (Google Drive / OneDrive / interna
 First, clone this repository to your local machine:
 
 ```bash
-git clone https://github.com/<org-or-username>/plant-health-backend.git
-cd plant-health-backend
+git clone -b backend-docker --single-branch https://github.com/adityagupta000/plant_backend.git
+cd plant_backend
 ```
 
 ---
