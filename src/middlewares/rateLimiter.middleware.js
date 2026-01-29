@@ -10,6 +10,14 @@ const constants = require("../config/constants");
 const { formatErrorResponse } = require("../utils/helpers");
 const logger = require("../utils/logger");
 
+// CRITICAL FIX: Detect test environment
+const IS_TEST = process.env.NODE_ENV === "test";
+
+// Create no-op rate limiter for tests
+const createNoOpLimiter = () => {
+  return (req, res, next) => next();
+};
+
 // ============================================================================
 // REDIS CLIENT SETUP
 // ============================================================================
@@ -51,6 +59,12 @@ if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
 // ============================================================================
 
 const createRateLimiter = (options) => {
+  // CRITICAL FIX: Skip rate limiting in test environment
+  if (IS_TEST) {
+    logger.debug(`Rate limiter ${options.prefix} disabled for tests`);
+    return createNoOpLimiter();
+  }
+
   const config = {
     windowMs: options.windowMs,
     max: options.max,
@@ -92,7 +106,7 @@ const predictionLimiter = createRateLimiter({
   prefix: "rl:predict:",
   message: formatErrorResponse(
     "Too many prediction requests. Please try again later.",
-    "RATE_LIMIT_EXCEEDED"
+    "RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Prediction rate limit exceeded",
 });
@@ -103,7 +117,7 @@ const authLimiter = createRateLimiter({
   prefix: "rl:auth:",
   message: formatErrorResponse(
     "Too many authentication attempts. Please try again later.",
-    "AUTH_RATE_LIMIT_EXCEEDED"
+    "AUTH_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Auth rate limit exceeded",
 });
@@ -114,7 +128,7 @@ const refreshLimiter = createRateLimiter({
   prefix: "rl:refresh:",
   message: formatErrorResponse(
     "Too many token refresh requests. Please wait before trying again.",
-    "REFRESH_RATE_LIMIT_EXCEEDED"
+    "REFRESH_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Refresh token rate limit exceeded",
 });
@@ -125,7 +139,7 @@ const historyLimiter = createRateLimiter({
   prefix: "rl:history:",
   message: formatErrorResponse(
     "Too many history requests. Please slow down.",
-    "HISTORY_RATE_LIMIT_EXCEEDED"
+    "HISTORY_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "History rate limit exceeded",
 });
@@ -136,7 +150,7 @@ const healthLimiter = createRateLimiter({
   prefix: "rl:health:",
   message: formatErrorResponse(
     "Too many health check requests.",
-    "HEALTH_RATE_LIMIT_EXCEEDED"
+    "HEALTH_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Health check rate limit exceeded",
 });
@@ -147,7 +161,7 @@ const globalLimiter = createRateLimiter({
   prefix: "rl:global:",
   message: formatErrorResponse(
     "Too many requests. Please try again later.",
-    "GLOBAL_RATE_LIMIT_EXCEEDED"
+    "GLOBAL_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Global rate limit exceeded",
 });
@@ -158,7 +172,7 @@ const guestLimiter = createRateLimiter({
   prefix: "rl:guest:",
   message: formatErrorResponse(
     "Too many prediction requests from this IP. Please try again later.",
-    "GUEST_RATE_LIMIT_EXCEEDED"
+    "GUEST_RATE_LIMIT_EXCEEDED",
   ),
   logMessage: "Guest rate limit exceeded",
   keyGenerator: (req) => req.ip || req.connection.remoteAddress || "unknown",

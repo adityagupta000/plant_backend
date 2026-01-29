@@ -94,7 +94,9 @@ const validate = (schemaName) => {
       logger.error("Validation schema not found", { schemaName });
       return res
         .status(500)
-        .json(formatErrorResponse("Internal validation error"));
+        .json(
+          formatErrorResponse("Internal validation error", "INTERNAL_ERROR"),
+        );
     }
 
     const { error, value } = schema.validate(req.body, {
@@ -105,19 +107,22 @@ const validate = (schemaName) => {
     if (error) {
       const details = error.details.map((detail) => detail.message);
 
+      // CRITICAL FIX: Create comprehensive error message
+      const errorMessage = details.join("; ");
+
       logger.warn("Validation failed", {
         schema: schemaName,
         errors: details,
       });
 
-      return res
-        .status(400)
-        .json(
-          formatErrorResponse("Validation failed", "VALIDATION_ERROR", details),
-        );
+      return res.status(400).json({
+        error: "Validation failed",
+        code: "VALIDATION_ERROR",
+        message: errorMessage, // Add this for backward compatibility
+        details: details,
+      });
     }
 
-    // Replace request body with validated data
     req.body = value;
     next();
   };
