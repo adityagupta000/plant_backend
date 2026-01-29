@@ -15,6 +15,17 @@ const config = {
     },
   },
 
+  test: {
+    dialect: "sqlite",
+    storage: ":memory:", // 👈 fast, isolated DB for Jest
+    logging: false,
+    define: {
+      timestamps: true,
+      underscored: false,
+      freezeTableName: true,
+    },
+  },
+
   production: {
     dialect: "postgres",
     host: process.env.DB_HOST,

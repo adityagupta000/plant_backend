@@ -3,7 +3,25 @@
  * FIXED: Matches training model name exactly
  */
 
+const IS_TEST = process.env.NODE_ENV === "test";
+
 module.exports = {
+  // ============================================================================
+  // RATE LIMITING CONFIGURATION - TEST FRIENDLY
+  // ============================================================================
+
+  PREDICTION_RATE_WINDOW_MS:
+    parseInt(process.env.PREDICTION_RATE_WINDOW_MS) || 900000,
+  PREDICTION_RATE_MAX: IS_TEST
+    ? 10000
+    : parseInt(process.env.PREDICTION_RATE_MAX) || 50,
+
+  AUTH_RATE_WINDOW_MS: parseInt(process.env.AUTH_RATE_WINDOW_MS) || 900000,
+  AUTH_RATE_MAX: IS_TEST ? 1000 : parseInt(process.env.AUTH_RATE_MAX) || 10,
+
+  HEALTH_RATE_WINDOW_MS: parseInt(process.env.HEALTH_RATE_WINDOW_MS) || 60000,
+  HEALTH_RATE_MAX: IS_TEST ? 1000 : parseInt(process.env.HEALTH_RATE_MAX) || 10,
+
   // ============================================================================
   // FILE UPLOAD CONFIGURATION
   // ============================================================================
@@ -13,7 +31,7 @@ module.exports = {
     process.env.ALLOWED_FILE_TYPES || "image/jpeg,image/png,image/jpg"
   ).split(","),
   ALLOWED_EXTENSIONS: (process.env.ALLOWED_EXTENSIONS || "jpg,jpeg,png").split(
-    ","
+    ",",
   ),
 
   // ============================================================================
