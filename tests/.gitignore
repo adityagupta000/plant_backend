@@ -1,0 +1,39 @@
+# Test Dependencies
+node_modules/
+package-lock.json
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Test Reports
+reports/
+*.html
+
+# Environment
+.env
+.env.test
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Test artifacts
+*.tmp.js
+test-temp-*
