@@ -19,6 +19,7 @@ pdf.py
 .env.production
 .env.development
 .env
+.env.test
 secrets/
 
 .env
