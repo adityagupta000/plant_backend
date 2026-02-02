@@ -313,25 +313,6 @@ async function appendRedisLog(key, value, maxLength = 100) {
 // ============================================================================
 
 const enhancedGuestLimiter = async (req, res, next) => {
-  // CRITICAL FIX: Skip guest rate limiting in test environment
-  if (IS_TEST) {
-    req.guestMetadata = {
-      ip: req.ip || "test-ip",
-      fingerprint: "test-fingerprint",
-      sessionId: "test-session",
-      ipUsage: 1,
-      fingerprintUsage: 1,
-      sessionUsage: 1,
-      limits: {
-        ipRemaining: 99,
-        dailyRemaining: 99,
-        sessionRemaining: 49,
-      },
-    };
-    logger.debug("Guest limiter bypassed for test environment");
-    return next();
-  }
-
   try {
     const ip = req.ip || req.connection.remoteAddress || "unknown";
     const fingerprint = generateBrowserFingerprint(req);
@@ -461,6 +442,7 @@ const enhancedGuestLimiter = async (req, res, next) => {
     const sessionKey = `guest:session:${sessionId}`;
     let sessionResult;
 
+    // CRITICAL FIX: Always increment before checking limit
     if (useRedis) {
       sessionResult = await incrementRedisKey(sessionKey, 3600);
     } else {
@@ -470,6 +452,12 @@ const enhancedGuestLimiter = async (req, res, next) => {
     if (!sessionResult) {
       sessionResult = { count: 1 };
     }
+
+    // Log the incremented value for debugging
+    logger.debug("Session counter incremented", {
+      sessionId,
+      count: sessionResult.count,
+    });
 
     if (sessionResult.count > SESSION_LIMIT) {
       logger.warn("Guest session limit exceeded", {

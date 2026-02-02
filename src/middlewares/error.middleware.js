@@ -2,7 +2,7 @@ const { formatErrorResponse } = require("../utils/helpers");
 const logger = require("../utils/logger");
 
 /**
- * Global error handling middleware
+ * Global error handling middleware - FIXED
  * Must be the last middleware in the chain
  */
 const errorMiddleware = (err, req, res, next) => {
@@ -19,6 +19,14 @@ const errorMiddleware = (err, req, res, next) => {
   let statusCode = 500;
   let message = "Internal server error";
   let code = "INTERNAL_ERROR";
+
+  // ✅ FIX: Handle JSON parsing errors
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    statusCode = 400;
+    message = "Invalid JSON format";
+    code = "INVALID_JSON";
+    return res.status(statusCode).json(formatErrorResponse(message, code));
+  }
 
   // Handle specific error types
 
