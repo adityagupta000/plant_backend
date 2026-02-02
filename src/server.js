@@ -281,5 +281,6 @@ if (NODE_ENV === "production") {
   ); // Every 6 hours
 }
 
-// Start the server
-startServer();
+if (process.env.NODE_ENV !== "test") {
+  startServer();
+}
