@@ -128,14 +128,13 @@ class PDFReportGenerator {
       .fillColor("#2c3e50")
       .text("Diagnosis:", this.margin + padding, y);
 
+    const predictedClassText = (
+      prediction.predicted_class || "Unknown"
+    ).replace(/_/g, " ");
     doc
       .fontSize(18)
       .fillColor(this._getStatusColor(prediction.predicted_class))
-      .text(
-        prediction.predicted_class.replace(/_/g, " "),
-        this.margin + 120,
-        y
-      );
+      .text(predictedClassText, this.margin + 120, y);
 
     y += 30;
 
@@ -151,11 +150,11 @@ class PDFReportGenerator {
       .font("Helvetica")
       .fillColor(this._getConfidenceColor(prediction.confidence))
       .text(
-        `${prediction.confidence_percentage.toFixed(2)}% (${
+        `${(prediction.confidence_percentage || 0).toFixed(2)}% (${
           prediction.confidence_level
         })`,
         this.margin + 120,
-        y
+        y,
       );
 
     y += 25;
@@ -208,13 +207,13 @@ class PDFReportGenerator {
     const rows = [
       {
         label: "Predicted Class",
-        value: prediction.predicted_class.replace(/_/g, " "),
+        value: (prediction.predicted_class || "Unknown").replace(/_/g, " "),
       },
       { label: "Category", value: prediction.category || "N/A" },
       { label: "Subtype", value: prediction.subtype || "N/A" },
       {
         label: "Confidence Score",
-        value: `${prediction.confidence_percentage.toFixed(2)}%`,
+        value: `${(prediction.confidence_percentage || 0).toFixed(2)}%`,
       },
       { label: "Confidence Level", value: prediction.confidence_level },
       { label: "Image Name", value: prediction.image_name || "Unknown" },
@@ -310,7 +309,11 @@ class PDFReportGenerator {
         .text(`#${index + 1}`, this.margin + 10, currentY + 5);
 
       // Class name
-      doc.text(prob.class.replace(/_/g, " "), this.margin + 60, currentY + 5);
+      doc.text(
+        (prob.class || "Unknown").replace(/_/g, " "),
+        this.margin + 60,
+        currentY + 5,
+      );
 
       // Probability bar
       const barWidth = 100;
@@ -325,7 +328,7 @@ class PDFReportGenerator {
         .rect(this.margin + 280, currentY + 5, filledWidth, barHeight)
         .fillAndStroke(
           this._getConfidenceColor(prob.confidence),
-          this._getConfidenceColor(prob.confidence)
+          this._getConfidenceColor(prob.confidence),
         );
 
       // Percentage
@@ -333,9 +336,9 @@ class PDFReportGenerator {
         .font("Helvetica")
         .fillColor("#34495e")
         .text(
-          `${prob.confidence_percentage.toFixed(2)}%`,
+          `${(prob.confidence_percentage || 0).toFixed(2)}%`,
           this.margin + 400,
-          currentY + 5
+          currentY + 5,
         );
 
       currentY += rowHeight;
@@ -428,7 +431,7 @@ class PDFReportGenerator {
         {
           width: this.contentWidth - 20,
           align: "justify",
-        }
+        },
       );
 
     // Page number
@@ -439,7 +442,7 @@ class PDFReportGenerator {
         `Generated on ${new Date().toLocaleString()} | Page 1`,
         this.margin,
         this.pageHeight - this.margin + 10,
-        { align: "center" }
+        { align: "center" },
       );
   }
 
@@ -448,6 +451,11 @@ class PDFReportGenerator {
    */
 
   _getStatusColor(predictedClass) {
+    // Guard against undefined/null predictedClass
+    if (!predictedClass || typeof predictedClass !== "string") {
+      return "#3498db"; // Default blue
+    }
+
     if (predictedClass === "Healthy") {
       return "#27ae60"; // Green
     } else if (predictedClass.startsWith("Pest")) {
@@ -455,7 +463,6 @@ class PDFReportGenerator {
     } else if (predictedClass.startsWith("Nutrient_")) {
       return "#f39c12"; // Orange
     } else if (predictedClass === "Not_Plant") {
-      // ADD THIS
       return "#95a5a6"; // Gray
     } else {
       return "#3498db"; // Blue
