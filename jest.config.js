@@ -1,5 +1,5 @@
 /**
- * Jest Configuration for Plant Health Backend Tests
+ * Jest Configuration for Plant Health Backend Tests - FIXED
  */
 
 module.exports = {
@@ -20,8 +20,8 @@ module.exports = {
   // Timeout
   testTimeout: 30000,
 
-  // Module resolution - use root node_modules
-  moduleDirectories: ["node_modules"],
+  // ✅ IMPROVED: Better module resolution
+  moduleDirectories: ["node_modules", "<rootDir>"],
   modulePaths: ["<rootDir>"],
 
   // Clear mocks between tests
@@ -29,18 +29,19 @@ module.exports = {
   resetMocks: true,
   restoreMocks: true,
 
-  // Verbose output
   verbose: true,
 
-  // Detect open handles
   detectOpenHandles: true,
   forceExit: true,
 
-  // Run tests serially to avoid DB conflicts
   maxWorkers: 1,
 
-  // Coverage (optional)
   collectCoverageFrom: ["src/**/*.js", "!src/server.js", "!src/**/*.test.js"],
   coverageDirectory: "tests/coverage",
-  coverageReporters: ["text", "lcov", "html"],
+  coverageReporters: ["text", "lcov", "html", "json"],
+
+  // Custom reporter for test reports
+  reporters: ["default", "<rootDir>/test-reporter/jestReporter.js"],
+
+  transformIgnorePatterns: ["node_modules/(?!(supertest)/)"],
 };
