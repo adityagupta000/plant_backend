@@ -79,6 +79,13 @@ module.exports = (sequelize) => {
         },
       },
 
+      last_logout_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: "last_logout_at",
+        defaultValue: null,
+      },
+
       created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
