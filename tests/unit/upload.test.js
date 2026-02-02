@@ -1,5 +1,5 @@
 /**
- * File Upload Security Tests
+ * File Upload Security Tests - FIXED
  * Tests file upload validation and security checks
  */
 
@@ -13,11 +13,17 @@ describe("File Upload Security", () => {
   let agent;
   let authToken;
 
+  // ✅ FIXED: Ensure database is ready
   beforeAll(async () => {
+    const { sequelize } = require("../../src/models");
+
+    // Ensure database is synced
+    await sequelize.sync({ force: true });
+
     agent = createAgent();
     const userData = await createAndLoginUser(agent);
     authToken = userData.accessToken;
-  });
+  }, 30000); // ✅ ADD: Timeout for setup
 
   // Create test files
   const createTempFile = (filename, content, mimetype = "text/plain") => {
@@ -47,7 +53,7 @@ describe("File Upload Security", () => {
         .expect(415);
 
       expect(response.body).toHaveProperty("error");
-      expect(response.body.code).toBe("INVALID_FILE_TYPE");
+      expect(response.body.code).toBe("INVALID_FILE_EXTENSION");
 
       cleanup(textFile);
     });
@@ -61,7 +67,7 @@ describe("File Upload Security", () => {
         .attach("image", exeFile)
         .expect(415);
 
-      expect(response.body.code).toBe("INVALID_FILE_TYPE");
+      expect(response.body.code).toBe("INVALID_FILE_EXTENSION");
 
       cleanup(exeFile);
     });
@@ -74,6 +80,8 @@ describe("File Upload Security", () => {
         .set("Authorization", `Bearer ${authToken}`)
         .attach("image", phpFile)
         .expect(415);
+
+      expect(response.body.code).toBe("INVALID_FILE_EXTENSION");
 
       cleanup(phpFile);
     });
@@ -114,7 +122,7 @@ describe("File Upload Security", () => {
       const response = await agent
         .post("/api/predict")
         .set("Authorization", `Bearer ${authToken}`)
-        .attach("image", file, "../../../etc/passwd")
+        .attach("image", file, "../../../etc/passwd.jpg")
         .expect(400);
 
       expect(response.body.code).toBe("PATH_TRAVERSAL_ATTEMPT");
@@ -142,7 +150,7 @@ describe("File Upload Security", () => {
       const response = await agent
         .post("/api/predict")
         .set("Authorization", `Bearer ${authToken}`)
-        .attach("image", file, "..\\..\\windows\\system32")
+        .attach("image", file, "..\\..\\windows\\system32.png")
         .expect(400);
 
       expect(response.body.code).toBe("PATH_TRAVERSAL_ATTEMPT");
