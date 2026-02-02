@@ -11,7 +11,7 @@ const {
   hasTestImage,
   getTestImagePath,
   expectSuccess,
-} = require("../../helpers/testHelpers");
+} = require("../helpers/testHelpers");
 
 describe("User Workflow Integration Tests", () => {
   const testImagePath = getTestImagePath();
