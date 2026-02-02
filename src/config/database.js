@@ -17,7 +17,7 @@ const config = {
 
   test: {
     dialect: "sqlite",
-    storage: ":memory:", // 👈 fast, isolated DB for Jest
+    storage: process.env.DB_PATH || "tests/test.sqlite",
     logging: false,
     define: {
       timestamps: true,
