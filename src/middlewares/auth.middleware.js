@@ -46,8 +46,8 @@ const authenticateToken = async (req, res, next) => {
             formatErrorResponse(
               "Access token expired",
               constants.ERROR_CODES.TOKEN_EXPIRED,
-              "Your session has expired. Please refresh your token."
-            )
+              "Your session has expired. Please refresh your token.",
+            ),
           );
       }
 
@@ -71,8 +71,33 @@ const authenticateToken = async (req, res, next) => {
       return res
         .status(401)
         .json(
-          formatErrorResponse("User not found or inactive", "USER_NOT_FOUND")
+          formatErrorResponse("User not found or inactive", "USER_NOT_FOUND"),
         );
+    }
+
+    // Check if token was issued before user's last logout
+    const { User } = require("../models");
+    const user = await User.findByPk(decoded.userId);
+
+    if (user && user.last_logout_at) {
+      const tokenIssuedAt = new Date(decoded.iat * 1000); // Convert Unix timestamp to Date
+      const lastLogoutAt = new Date(user.last_logout_at);
+
+      if (tokenIssuedAt < lastLogoutAt) {
+        logger.warn("Token issued before last logout", {
+          userId: decoded.userId,
+          tokenIssuedAt,
+          lastLogoutAt,
+        });
+        return res
+          .status(401)
+          .json(
+            formatErrorResponse(
+              "Token has been revoked due to logout",
+              "TOKEN_REVOKED",
+            ),
+          );
+      }
     }
 
     // Attach user info to request
