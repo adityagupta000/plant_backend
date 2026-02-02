@@ -52,8 +52,8 @@ class PredictionController {
           {
             session,
           },
-          "Session created successfully"
-        )
+          "Session created successfully",
+        ),
       );
     } catch (error) {
       next(error);
@@ -67,17 +67,24 @@ class PredictionController {
   async predict(req, res, next) {
     try {
       const userId = req.userId;
-      const sessionId = req.body.session_id
-        ? parseInt(req.body.session_id)
-        : null;
+      const sessionId =
+        req.body && req.body.session_id ? parseInt(req.body.session_id) : null;
       const file = req.file;
 
-      // Validate file upload
+      // Validate file upload - this check ensures file is present before processing
       if (!file) {
         logger.warn("Prediction request without file", { userId });
         return res
           .status(400)
           .json(formatErrorResponse("Image file is required", "FILE_REQUIRED"));
+      }
+
+      // Additional safety check
+      if (!file.path) {
+        logger.error("File object missing path property", { userId });
+        return res
+          .status(400)
+          .json(formatErrorResponse("Invalid file upload", "FILE_REQUIRED"));
       }
 
       logger.info("Processing prediction request", {
@@ -91,7 +98,7 @@ class PredictionController {
       const result = await predictionService.processPrediction(
         userId,
         sessionId,
-        file
+        file,
       );
 
       logger.info("Prediction completed", {
@@ -122,8 +129,8 @@ class PredictionController {
               created_at: result.prediction.created_at,
             },
           },
-          "Prediction successful"
-        )
+          "Prediction successful",
+        ),
       );
     } catch (error) {
       next(error);
