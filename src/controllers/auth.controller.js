@@ -139,9 +139,19 @@ class AuthController {
   async logout(req, res, next) {
     try {
       const refreshToken = req.cookies[jwtConfig.cookie.name];
+      const userId = req.userId;
 
       if (refreshToken) {
         await authService.logout(refreshToken);
+      }
+
+      // Update user's last logout time
+      if (userId) {
+        const { User } = require("../models");
+        await User.update(
+          { last_logout_at: new Date() },
+          { where: { id: userId } },
+        );
       }
 
       res.clearCookie(jwtConfig.cookie.name, {
@@ -169,6 +179,15 @@ class AuthController {
       const userId = req.userId;
 
       const revokedCount = await authService.logoutAll(userId);
+
+      // Update user's last logout time
+      if (userId) {
+        const { User } = require("../models");
+        await User.update(
+          { last_logout_at: new Date() },
+          { where: { id: userId } },
+        );
+      }
 
       res.clearCookie(jwtConfig.cookie.name, {
         httpOnly: jwtConfig.cookie.httpOnly,
