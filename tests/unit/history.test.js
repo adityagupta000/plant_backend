@@ -1,8 +1,9 @@
 /**
- * History/Session Unit Tests
+ * History/Session Unit Tests - FIXED
  * Tests history and session management endpoints with Jest + Supertest
  */
 
+// ✅ FIXED: Correct import path
 const {
   createAgent,
   createAndLoginUser,
@@ -11,7 +12,7 @@ const {
   getTestImagePath,
   expectSuccess,
   expectError,
-} = require("../../helpers/testHelpers");
+} = require("../helpers/testHelpers");
 
 describe("History API", () => {
   let agent;
@@ -211,7 +212,7 @@ describe("History API", () => {
   describe("GET /api/history/predictions/:predictionId", () => {
     it("should get prediction details", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -222,7 +223,7 @@ describe("History API", () => {
         .expect(200);
 
       if (sessionsResponse.body.sessions.length === 0) {
-        console.log("⏭️  Skipping: No sessions available");
+        console.log("⚠️ Skipping: No sessions available");
         return;
       }
 
@@ -235,7 +236,7 @@ describe("History API", () => {
         .expect(200);
 
       if (predictionsResponse.body.predictions.length === 0) {
-        console.log("⏭️  Skipping: No predictions available");
+        console.log("⚠️ Skipping: No predictions available");
         return;
       }
 
