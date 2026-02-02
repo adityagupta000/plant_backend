@@ -1,5 +1,5 @@
 /**
- * Test Helper Functions
+ * Test Helper Functions - FIXED
  * Reusable utilities for Jest/Supertest tests
  */
 
@@ -41,52 +41,81 @@ const createTestUser = async (agent) => {
   const email = generateUniqueEmail();
   const password = "TestPass123!@#";
 
-  const response = await agent
-    .post("/api/auth/register")
-    .send({ username, email, password })
-    .expect(201);
+  try {
+    const response = await agent
+      .post("/api/auth/register")
+      .send({ username, email, password })
+      .expect(201);
 
-  return {
-    username,
-    email,
-    password,
-    user: response.body.user,
-  };
+    return {
+      username,
+      email,
+      password,
+      user: response.body.user,
+    };
+  } catch (error) {
+    // ✅ ENHANCED: Better error reporting
+    console.error("❌ createTestUser failed:");
+    console.error("  Error:", error.message);
+    if (error.response) {
+      console.error("  Status:", error.response.status);
+      console.error("  Body:", JSON.stringify(error.response.body, null, 2));
+    }
+    throw error;
+  }
 };
 
 /**
  * Login with credentials
  */
 const loginUser = async (agent, email, password) => {
-  const response = await agent
-    .post("/api/auth/login")
-    .send({ email, password })
-    .expect(200);
+  try {
+    const response = await agent
+      .post("/api/auth/login")
+      .send({ email, password })
+      .expect(200);
 
-  return {
-    accessToken: response.body.accessToken,
-    user: response.body.user,
-    expiresIn: response.body.expiresIn,
-  };
+    return {
+      accessToken: response.body.accessToken,
+      user: response.body.user,
+      expiresIn: response.body.expiresIn,
+    };
+  } catch (error) {
+    // ✅ ENHANCED: Better error reporting
+    console.error("❌ loginUser failed:");
+    console.error("  Error:", error.message);
+    if (error.response) {
+      console.error("  Status:", error.response.status);
+      console.error("  Body:", JSON.stringify(error.response.body, null, 2));
+    }
+    throw error;
+  }
 };
 
 /**
  * Create user and login (convenience method)
  */
 const createAndLoginUser = async (agent) => {
-  const testUser = await createTestUser(agent);
-  const loginData = await loginUser(agent, testUser.email, testUser.password);
+  try {
+    const testUser = await createTestUser(agent);
+    const loginData = await loginUser(agent, testUser.email, testUser.password);
 
-  return {
-    ...testUser,
-    ...loginData,
-  };
+    return {
+      ...testUser,
+      ...loginData,
+    };
+  } catch (error) {
+    // ✅ ENHANCED: Better error reporting
+    console.error("❌ createAndLoginUser failed:");
+    console.error("  Error:", error.message);
+    throw error;
+  }
 };
 
 /**
  * Upload test image
  */
-const uploadImage = async (agent, imagePath, token = null) => {
+const uploadImage = (agent, imagePath, token = null) => {
   const absolutePath = path.resolve(imagePath);
 
   if (!fs.existsSync(absolutePath)) {
@@ -105,7 +134,7 @@ const uploadImage = async (agent, imagePath, token = null) => {
 /**
  * Upload guest image
  */
-const uploadGuestImage = async (agent, imagePath) => {
+const uploadGuestImage = (agent, imagePath) => {
   const absolutePath = path.resolve(imagePath);
 
   if (!fs.existsSync(absolutePath)) {
@@ -154,11 +183,12 @@ const waitForCondition = async (
  * Get test image path
  */
 const getTestImagePath = () => {
-  const testImagePath = process.env.TEST_IMAGE || "../../test-data/test-plant.jpg";
+  const testImagePath =
+    process.env.TEST_IMAGE || "../../test-data/test-plant.jpg";
   const absolutePath = path.resolve(__dirname, testImagePath);
 
   if (!fs.existsSync(absolutePath)) {
-    console.warn(`⚠️  Test image not found: ${absolutePath}`);
+    console.warn(`⚠️ Test image not found: ${absolutePath}`);
     return null;
   }
 
