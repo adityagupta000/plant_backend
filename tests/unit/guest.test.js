@@ -1,8 +1,9 @@
 /**
- * Guest Prediction Unit Tests
+ * Guest Prediction Unit Tests - FIXED
  * Tests guest mode endpoints with Jest + Supertest
  */
 
+// ✅ FIXED: Correct import path
 const {
   createAgent,
   uploadGuestImage,
@@ -10,7 +11,12 @@ const {
   getTestImagePath,
   expectSuccess,
   expectError,
-} = require("../../helpers/testHelpers");
+} = require("../helpers/testHelpers");
+
+// Import the guest limiter to clear memory store between tests
+const {
+  clearMemoryStore,
+} = require("../../src/middlewares/guestRateLimiter.middleware");
 
 describe("Guest Prediction API", () => {
   let agent;
@@ -18,20 +24,22 @@ describe("Guest Prediction API", () => {
 
   beforeEach(() => {
     agent = createAgent();
+    // Clear guest session store before each test to avoid rate limiting issues
+    clearMemoryStore();
   });
 
   describe("POST /api/guest/predict", () => {
     beforeAll(() => {
       if (!hasTestImage()) {
         console.warn(
-          "⚠️  Test image not available - skipping guest prediction tests",
+          "⚠️ Test image not available - skipping guest prediction tests",
         );
       }
     });
 
     it("should make guest prediction successfully", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -59,7 +67,7 @@ describe("Guest Prediction API", () => {
 
     it("should track guest usage across requests", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -82,7 +90,7 @@ describe("Guest Prediction API", () => {
 
     it("should show login prompt after usage", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -105,7 +113,7 @@ describe("Guest Prediction API", () => {
 
     it("should limit guest features compared to authenticated users", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -134,7 +142,7 @@ describe("Guest Prediction API", () => {
 
     it("should enforce rate limits for guests", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️  Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -157,7 +165,7 @@ describe("Guest Prediction API", () => {
         expect(limitedResponse.body.code).toMatch(/LIMIT_EXCEEDED/);
       } else {
         // All passed - rate limit not hit yet
-        console.log("⚠️  Rate limit not hit in 5 requests");
+        console.log("⚠️ Rate limit not hit in 5 requests");
       }
     }, 300000); // 5 minutes timeout
   });
