@@ -19,6 +19,10 @@
     "test:history": "cross-env NODE_ENV=test jest --testPathPattern=history.test --runInBand",
     "test:debug": "cross-env NODE_ENV=test node --inspect-brk node_modules/.bin/jest --runInBand",
     "test:ci": "cross-env NODE_ENV=test jest --ci --coverage --maxWorkers=2",
+    "test:report": "node test-reporter/cli.js all",
+    "test:unit:report": "node test-reporter/cli.js unit",
+    "test:integration:report": "node test-reporter/cli.js integration",
+    "test:e2e:report": "node test-reporter/cli.js e2e",
     "check:redis": "redis-cli ping || echo 'Redis not running'",
     "start:redis": "docker run -d -p 6379:6379 --name plant-health-redis redis:alpine"
   },
@@ -31,6 +35,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^7.5.0",
     "file-type": "^16.5.4",
