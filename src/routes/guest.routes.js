@@ -9,7 +9,11 @@ const guestController = require("../controllers/guest.controller");
 const {
   enhancedGuestLimiter,
 } = require("../middlewares/guestRateLimiter.middleware");
-const { upload, handleMulterError } = require("../utils/upload");
+const {
+  upload,
+  uploadWithSignatureValidation,
+  handleMulterError,
+} = require("../utils/upload");
 
 /**
  * @route POST /api/guest/predict
@@ -25,8 +29,7 @@ const { upload, handleMulterError } = require("../utils/upload");
 router.post(
   "/predict",
   enhancedGuestLimiter,
-  upload.single("image"),
-  handleMulterError,
+  ...uploadWithSignatureValidation,
   guestController.predict,
 );
 

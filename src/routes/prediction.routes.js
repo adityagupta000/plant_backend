@@ -9,7 +9,11 @@ const predictionController = require("../controllers/prediction.controller");
 const { authenticateToken } = require("../middlewares/auth.middleware");
 const { validate } = require("../middlewares/validation.middleware");
 const { predictionLimiter } = require("../middlewares/rateLimiter.middleware");
-const { upload, handleMulterError } = require("../utils/upload");
+const {
+  upload,
+  uploadWithSignatureValidation,
+  handleMulterError,
+} = require("../utils/upload");
 const pdfGenerator = require("../utils/pdfGenerator");
 const {
   formatSuccessResponse,
@@ -49,8 +53,7 @@ router.post(
 router.post(
   "/",
   predictionLimiter,
-  upload.single("image"),
-  handleMulterError,
+  ...uploadWithSignatureValidation,
   predictionController.predict,
 );
 
