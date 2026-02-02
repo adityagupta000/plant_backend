@@ -5,7 +5,7 @@
 
 // Set test environment variables
 process.env.NODE_ENV = "test";
-process.env.DB_PATH = ":memory:";
+process.env.DB_PATH = "tests/test.sqlite";
 process.env.LOG_LEVEL = "error";
 
 // JWT Secrets
