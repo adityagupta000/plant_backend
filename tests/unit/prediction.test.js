@@ -3,6 +3,7 @@
  * Tests prediction endpoints with Jest + Supertest
  */
 
+// ✅ FIXED: Correct import path
 const {
   createAgent,
   createAndLoginUser,
@@ -11,12 +12,13 @@ const {
   getTestImagePath,
   expectSuccess,
   expectError,
-} = require("../../helpers/testHelpers");
+} = require("../helpers/testHelpers");
 
 describe("Prediction API", () => {
   let agent;
   let authToken;
   let userId;
+  const testImagePath = getTestImagePath();
 
   beforeAll(async () => {
     agent = createAgent();
@@ -75,8 +77,6 @@ describe("Prediction API", () => {
   });
 
   describe("POST /api/predict", () => {
-    const testImagePath = getTestImagePath();
-
     beforeAll(() => {
       if (!hasTestImage()) {
         console.warn("⚠️ Test image not available - skipping prediction tests");
@@ -85,7 +85,7 @@ describe("Prediction API", () => {
 
     it("should make prediction with valid image", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️ Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -129,7 +129,7 @@ describe("Prediction API", () => {
 
     it("should make prediction with specific session", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️ Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -153,7 +153,7 @@ describe("Prediction API", () => {
 
     it("should reject prediction without authentication", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️ Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
@@ -195,7 +195,7 @@ describe("Prediction API", () => {
   describe("POST /api/predict/download-pdf", () => {
     it("should generate PDF report for authenticated users", async () => {
       if (!hasTestImage()) {
-        console.log("⏭️ Skipping: No test image available");
+        console.log("⚠️ Skipping: No test image available");
         return;
       }
 
