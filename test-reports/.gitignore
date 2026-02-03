@@ -1,8 +1,8 @@
-# Test Reports - Excel files and logs
-*.xlsx
-*.xls
-test-results.json
-latest-report.*
+# # Test Reports - Excel files and logs
+# *.xlsx
+# *.xls
+# test-results.json
+# latest-report.*
 
-# Keep this directory but ignore contents
-!.gitkeep
+# # Keep this directory but ignore contents
+# !.gitkeep
