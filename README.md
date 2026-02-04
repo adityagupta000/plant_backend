@@ -1,4 +1,4 @@
-# Plant Health Monitoring Backend - Complete Documentation
+# Plant Health Monitoring Backend Documentation
 
 ## Table of Contents
 
