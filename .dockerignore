@@ -11,10 +11,17 @@ ai/__pycache__/
 __pycache__/
 *.py[cod]
 
-# Environment files (will be provided at runtime)
+# ============================================================================
+# Environment & Configuration Files
+# These are provided at runtime via Docker or environment
+# ============================================================================
 .env
 .env.local
 .env.*.local
+.env.docker
+.env.production
+.env.development
+.env.test
 
 # Logs
 logs/*.log
@@ -27,7 +34,33 @@ Thumbs.db
 # Git
 .git/
 .gitignore
+.gitkeep
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+tests/
+test-data/
+test-reports/
+test-reporter/
+*.test.js
+jest.config.js
+
+# Build artifacts
+dist/
+build/
+*.o
+*.a
+
+# Documentation
+*.md
+QA_DOCKER_TESTING.md
+DOCKER_SECRETS_GUIDE.md
+README.md
 # Documentation
 *.md
 SETUP_GUIDE.md

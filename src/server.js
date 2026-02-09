@@ -1,5 +1,38 @@
 require("dotenv").config();
 
+// ============================================================================
+// CRITICAL: Load secrets FIRST before importing any modules that use them
+// This must happen before app.js is loaded
+// ============================================================================
+const SecretLoader = require("./utils/secretLoader");
+
+/**
+ * Load JWT secrets from Docker Secrets or environment variables
+ * Docker Secrets are more secure as they're never exposed as environment variables
+ */
+try {
+  process.env.ACCESS_TOKEN_SECRET = SecretLoader.loadSecret(
+    "jwt_access_secret",
+    "ACCESS_TOKEN_SECRET",
+  );
+  process.env.REFRESH_TOKEN_SECRET = SecretLoader.loadSecret(
+    "jwt_refresh_secret",
+    "REFRESH_TOKEN_SECRET",
+  );
+} catch (error) {
+  console.error("FATAL ERROR: Failed to load JWT secrets!");
+  console.error(error.message);
+  process.exit(1);
+}
+
+if (!process.env.ACCESS_TOKEN_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
+  console.error("FATAL ERROR: JWT secrets not configured!");
+  process.exit(1);
+}
+
+// ============================================================================
+// Now safe to import app and other modules that depend on JWT config
+// ============================================================================
 const app = require("./app");
 const { testConnection, syncDatabase, closeConnection } = require("./models");
 const aiService = require("./services/ai.service");
@@ -11,11 +44,6 @@ const path = require("path");
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || "localhost";
 const NODE_ENV = process.env.NODE_ENV || "development";
-
-if (!process.env.ACCESS_TOKEN_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
-  console.error("FATAL ERROR: JWT secrets not configured!");
-  process.exit(1);
-}
 
 let server;
 let isShuttingDown = false;
@@ -282,5 +310,9 @@ if (NODE_ENV === "production") {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  startServer();
+  startServer().catch((error) => {
+    console.error("✗ FATAL SERVER ERROR:", error.message);
+    console.error(error.stack);
+    process.exit(1);
+  });
 }

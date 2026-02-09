@@ -12,9 +12,113 @@ services:
     ports:
       - "5000:5000"
 
-    # Load ALL environment variables from docker env file
-    env_file:
-      - .env.docker
+    # Non-secret environment variables (Safe to version control)
+    environment:
+      # Server
+      NODE_ENV: production
+      PORT: 5000
+      HOST: 0.0.0.0
+      FRONTEND_URL: http://localhost:5173
+
+      # Database (SQLite in local, PostgreSQL in production)
+      DB_PATH: /app/data/database.sqlite
+      DB_DIALECT: sqlite
+      DB_LOGGING: "false"
+
+      # Token configuration (expiration times, not secrets)
+      ACCESS_TOKEN_EXPIRE: 15m
+      REFRESH_TOKEN_EXPIRE: 7d
+      REFRESH_TOKEN_COOKIE_NAME: refreshToken
+      COOKIE_SECURE: "false"
+      COOKIE_SAME_SITE: strict
+
+      # Security settings
+      BCRYPT_ROUNDS: 10
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCKOUT_DURATION_MS: 900000
+      MIN_JWT_SECRET_LENGTH: 32
+
+      # Redis
+      REDIS_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+
+      # AI Configuration
+      PYTHON_PATH: /usr/local/bin/python
+      MODEL_PATH: /app/ai/saved_models/best_model.encrypted
+      MODEL_KEY_PATH: /app/ai/secrets/model.key
+      AI_WORKERS: 4
+      AI_SERVICE_TIMEOUT: 30000
+      AI_SERVICE_MAX_RETRIES: 3
+      AI_SERVICE_RETRY_DELAY: 1000
+      AI_MAX_OUTPUT_SIZE: 1048576
+
+      # File Upload
+      MAX_FILE_SIZE: 5242880
+      ALLOWED_FILE_TYPES: image/jpeg,image/png,image/jpg
+      ALLOWED_EXTENSIONS: jpg,jpeg,png
+
+      # Guest Mode
+      GUEST_MODE_ENABLED: "true"
+      GUEST_PREDICTION_LIMIT: 10
+      GUEST_IP_LIMIT: 2
+      GUEST_FINGERPRINT_LIMIT: 10
+      GUEST_SESSION_LIMIT: 4
+      GUEST_IP_WINDOW_MS: 3600000
+      GUEST_FINGERPRINT_WINDOW_MS: 86400000
+      GUEST_RAPID_REQUEST_THRESHOLD: 5
+      GUEST_RAPID_REQUEST_BLOCK_MS: 900000
+      GUEST_PDF_DOWNLOAD_ENABLED: "false"
+
+      # Rate Limiting
+      GLOBAL_RATE_WINDOW_MS: 900000
+      GLOBAL_RATE_MAX: 1000
+      PREDICTION_RATE_WINDOW_MS: 900000
+      PREDICTION_RATE_MAX: 50
+      AUTH_RATE_WINDOW_MS: 900000
+      AUTH_RATE_MAX: 10
+      HEALTH_RATE_WINDOW_MS: 60000
+      HEALTH_RATE_MAX: 10
+
+      # Storage & Cleanup
+      STORAGE_TYPE: local
+      TEMP_FILE_CLEANUP: "true"
+      CLEANUP_DELAY_MS: 10000
+
+      # Logging
+      LOG_LEVEL: error
+
+      # Secrets (Environment Variable Fallback)
+      # These are read from Docker Secrets first, but if they don't mount,
+      # these environment variables are used as fallback
+      ACCESS_TOKEN_SECRET: b241957dd882b2ec1bc9551ca3fe313076f041f5ce291efe744d69a68c91b068
+      REFRESH_TOKEN_SECRET: 698c8ae8acaeec193703c33cbfe43deadc625d5feb2095055564049e368f5bee
+      REDIS_PASSWORD: 6bf5e5da70d3e39c9d1a325122218ba15664f07bd6b82540353c7bb5191ce062
+
+      # Features
+      PDF_DOWNLOAD_ENABLED: "true"
+      HISTORY_TRACKING_ENABLED: "true"
+      EMAIL_NOTIFICATIONS_ENABLED: "false"
+      CLOUD_STORAGE_ENABLED: "false"
+      ANALYTICS_ENABLED: "false"
+
+      # Timeouts
+      REQUEST_TIMEOUT: 30000
+      DB_QUERY_TIMEOUT: 10000
+      FILE_UPLOAD_TIMEOUT: 60000
+      AI_HEALTH_CHECK_TIMEOUT: 5000
+      PDF_GENERATION_TIMEOUT: 15000
+
+    # =========================================================================
+    # Docker Secrets - Secure secret management
+    # Secrets are mounted at /run/secrets/{secretName} in container
+    # SecretLoader reads from these paths and falls back to env vars
+    # =========================================================================
+    secrets:
+      - jwt_access_secret
+      - jwt_refresh_secret
+      - redis_password
 
     volumes:
       # Persistent data volumes
@@ -38,7 +142,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://localhost:5000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
+          "require('http').get('http://localhost:5000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))",
         ]
       interval: 30s
       timeout: 10s
@@ -56,7 +160,14 @@ services:
     ports:
       - "6379:6379"
 
-    command: redis-server --appendonly yes
+    # Use redis config from file for maximum security
+    # The config file can reference the secret mounted at /run/secrets/redis_password
+    command: >
+      sh -c 'redis-server --appendonly yes 
+      --requirepass $$(cat /run/secrets/redis_password)'
+
+    secrets:
+      - redis_password
 
     volumes:
       - redis-data:/data
@@ -65,10 +176,29 @@ services:
       - app-network
 
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "6bf5e5da70d3e39c9d1a325122218ba15664f07bd6b82540353c7bb5191ce062",
+          "ping",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+# ============================================================================
+# Docker Secrets - Global secret definitions
+# These secrets are mounted at /run/secrets/{secretName} in containers
+# ============================================================================
+secrets:
+  jwt_access_secret:
+    file: ./secrets/jwt_access_secret.txt
+  jwt_refresh_secret:
+    file: ./secrets/jwt_refresh_secret.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
 
 # ============================================================================
 # Networks

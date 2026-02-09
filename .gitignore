@@ -18,9 +18,16 @@ pdf.py
 *.db
 .env.production
 .env.development
-.env
 .env.test
-secrets/
+
+# ============================================================================
+# CRITICAL: Never commit secret files!
+# ============================================================================
+# Docker secret files - sensitive values stored locally
+secrets/*.txt
+# But keep directory structure and documentation visible
+!secrets/.gitkeep
+!secrets/README.md
 
 .env
 .env.docker
