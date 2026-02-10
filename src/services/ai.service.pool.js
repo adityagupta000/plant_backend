@@ -323,7 +323,18 @@ class AIWorker extends EventEmitter {
 
 class AIWorkerPool {
   constructor() {
-    this.pythonPath = process.env.PYTHON_PATH;
+    // On Windows: ignore Docker env vars, use Windows default
+    // On Unix/Linux: use env var if set
+    if (
+      process.platform === "win32" &&
+      process.env.PYTHON_PATH?.includes("/")
+    ) {
+      // Docker path on Windows - ignore it
+      this.pythonPath = null;
+    } else {
+      this.pythonPath = process.env.PYTHON_PATH;
+    }
+
     if (!this.pythonPath) {
       const venvDir = path.join(__dirname, "../../ai/venv");
       if (process.platform === "win32") {

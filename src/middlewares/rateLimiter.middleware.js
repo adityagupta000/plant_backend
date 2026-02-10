@@ -10,8 +10,9 @@ const constants = require("../config/constants");
 const { formatErrorResponse } = require("../utils/helpers");
 const logger = require("../utils/logger");
 
-// CRITICAL FIX: Detect test environment
+// CRITICAL FIX: Detect test/load-test environment
 const IS_TEST = process.env.NODE_ENV === "test";
+const IS_LOAD_TEST = process.env.LOAD_TEST === "true";
 
 // Create no-op rate limiter for tests
 const createNoOpLimiter = () => {
@@ -59,9 +60,11 @@ if (process.env.REDIS_HOST && process.env.REDIS_PORT) {
 // ============================================================================
 
 const createRateLimiter = (options) => {
-  // CRITICAL FIX: Skip rate limiting in test environment
-  if (IS_TEST) {
-    logger.debug(`Rate limiter ${options.prefix} disabled for tests`);
+  // CRITICAL FIX: Skip rate limiting in test environment or load test mode
+  if (IS_TEST || IS_LOAD_TEST) {
+    logger.debug(
+      `Rate limiter ${options.prefix} disabled for tests/load-tests`,
+    );
     return createNoOpLimiter();
   }
 

@@ -4,6 +4,7 @@
  */
 
 const IS_TEST = process.env.NODE_ENV === "test";
+const IS_LOAD_TEST = process.env.LOAD_TEST === "true";
 
 module.exports = {
   // ============================================================================
@@ -12,15 +13,20 @@ module.exports = {
 
   PREDICTION_RATE_WINDOW_MS:
     parseInt(process.env.PREDICTION_RATE_WINDOW_MS) || 900000,
-  PREDICTION_RATE_MAX: IS_TEST
-    ? 10000
-    : parseInt(process.env.PREDICTION_RATE_MAX) || 50,
+  PREDICTION_RATE_MAX:
+    IS_TEST || IS_LOAD_TEST
+      ? 10000
+      : parseInt(process.env.PREDICTION_RATE_MAX) || 50,
 
   AUTH_RATE_WINDOW_MS: parseInt(process.env.AUTH_RATE_WINDOW_MS) || 900000,
-  AUTH_RATE_MAX: IS_TEST ? 1000 : parseInt(process.env.AUTH_RATE_MAX) || 10,
+  AUTH_RATE_MAX:
+    IS_TEST || IS_LOAD_TEST ? 1000 : parseInt(process.env.AUTH_RATE_MAX) || 10,
 
   HEALTH_RATE_WINDOW_MS: parseInt(process.env.HEALTH_RATE_WINDOW_MS) || 60000,
-  HEALTH_RATE_MAX: IS_TEST ? 1000 : parseInt(process.env.HEALTH_RATE_MAX) || 10,
+  HEALTH_RATE_MAX:
+    IS_TEST || IS_LOAD_TEST
+      ? 1000
+      : parseInt(process.env.HEALTH_RATE_MAX) || 10,
 
   // ============================================================================
   // FILE UPLOAD CONFIGURATION

@@ -19,6 +19,7 @@ const SESSION_LIMIT = 4; // Maximum predictions per session
 const IP_LIMIT = 5; // Maximum predictions per hour per IP
 const FINGERPRINT_LIMIT = 10; // Maximum predictions per day per fingerprint
 const IS_TEST = process.env.NODE_ENV === "test";
+const IS_LOAD_TEST = process.env.LOAD_TEST === "true";
 
 // ============================================================================
 // REDIS CLIENT SETUP
@@ -67,8 +68,8 @@ class InMemoryGuestStore {
     this.sessions = new Map();
     this.cleanupInterval = null; // STORE INTERVAL ID
 
-    // ONLY start cleanup in non-test environments
-    if (process.env.NODE_ENV !== "test") {
+    // ONLY start cleanup in non-test and non-load-test environments
+    if (process.env.NODE_ENV !== "test" && !IS_LOAD_TEST) {
       this.startCleanup();
     }
   }
@@ -313,6 +314,12 @@ async function appendRedisLog(key, value, maxLength = 100) {
 // ============================================================================
 
 const enhancedGuestLimiter = async (req, res, next) => {
+  // CRITICAL FIX: Bypass all guest rate limiting in load test mode
+  if (IS_LOAD_TEST) {
+    logger.debug("Guest rate limiters bypassed for load testing");
+    return next();
+  }
+
   try {
     const ip = req.ip || req.connection.remoteAddress || "unknown";
     const fingerprint = generateBrowserFingerprint(req);

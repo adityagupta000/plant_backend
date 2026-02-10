@@ -1,0 +1,212 @@
+# Load Testing: Realistic Scenario
+# Purpose: Simulate realistic user behavior patterns
+# Simulates: Real application usage with natural think time and user flows
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    # Morning: Low traffic
+    - duration: 60
+      arrivalRate: 3
+      name: "Morning (low traffic)"
+
+    # Mid-morning: Increase as more users wake up
+    - duration: 60
+      arrivalRate: 8
+      name: "Mid-morning (climbing)"
+
+    # Lunch time: Peak traffic
+    - duration: 120
+      arrivalRate: 15
+      name: "Lunch peak"
+
+    # Afternoon: Slight drop
+    - duration: 120
+      arrivalRate: 10
+      name: "Afternoon (sustained)"
+
+    # Evening: Rise again
+    - duration: 120
+      arrivalRate: 12
+      name: "Evening rise"
+
+    # Night: Drop off
+    - duration: 60
+      arrivalRate: 5
+      name: "Night (low)"
+
+    # Cool down
+    - duration: 30
+      arrivalRate: 0
+      name: "Cool down"
+
+  processor: "./processors/realisticProcessor.js"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+      includeQueryString: false
+
+scenarios:
+  # Casual guest user: Check predictions, browse results
+  - name: "Casual Guest User"
+    weight: 35
+    flow:
+      # Get health status
+      - get:
+          url: "/api/system/health"
+          expect:
+            - statusCode: 200
+
+      - think: 3 # Browse page for 3 seconds
+
+      # Make a prediction
+      - post:
+          url: "/api/guest/predict"
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.predictions"
+            as: "predictions"
+
+      - think: 5 # Look at results for 5 seconds
+
+      # Check system health
+      - get:
+          url: "/api/system/health"
+          expect:
+            - statusCode: 200
+
+      - think: 3
+
+  # Power user: Multiple predictions, active user
+  - name: "Power User"
+    weight: 25
+    flow:
+      # Login
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "TestPassword123!"
+          capture:
+            json: "$.accessToken"
+            as: "userToken"
+
+      - think: 2
+
+      # Multiple predictions in sequence
+      - loop:
+          - post:
+              url: "/api/prediction"
+              headers:
+                Authorization: "Bearer {{ userToken }}"
+              formData:
+                image: "placeholder" # Processor will replace with actual file stream
+              expect:
+                - statusCode: 200
+
+          - think: 2
+
+        count: 3
+
+      - think: 3
+
+      # Get prediction history
+      - get:
+          url: "/api/history?page=1&limit=10"
+          headers:
+            Authorization: "Bearer {{ userToken }}"
+          expect:
+            - statusCode: 200
+
+      - think: 4
+
+  # New user: Registration flow
+  - name: "New User Registration"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            username: "placeholder" # Processor will generate unique alphanumeric
+            email: "placeholder@loadtest.example.com" # Processor will generate unique
+            password: "TestPassword123!"
+            confirmPassword: "TestPassword123!"
+          expect:
+            - statusCode: 201
+          capture:
+            json: "$.accessToken"
+            as: "newUserToken"
+
+      - think: 2
+
+      # Immediate first prediction
+      - post:
+          url: "/api/prediction"
+          headers:
+            Authorization: "Bearer {{ newUserToken }}"
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          expect:
+            - statusCode: 200
+
+      - think: 5
+
+  # Admin/System monitoring
+  - name: "System Monitoring"
+    weight: 10
+    flow:
+      # Frequent health checks
+      - loop:
+          - get:
+              url: "/api/system/health"
+              expect:
+                - statusCode: 200
+
+          - think: 10
+
+        count: 2
+
+      # Status check
+      - get:
+          url: "/api/system/status"
+          expect:
+            - statusCode: 200
+
+      - think: 5
+
+  # Mobile user: Faster interactions, lower processing
+  - name: "Mobile User"
+    weight: 15
+    flow:
+      # Mobile users make quicker predictions
+      - post:
+          url: "/api/guest/predict"
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          expect:
+            - statusCode: 200
+
+      - think: 2 # Quick look
+
+      # Check recent history
+      - get:
+          url: "/api/guest/history?limit=3"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+      # Another quick prediction
+      - post:
+          url: "/api/guest/predict"
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          expect:
+            - statusCode: 200
+
+      - think: 1

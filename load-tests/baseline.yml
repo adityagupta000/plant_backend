@@ -1,0 +1,37 @@
+# Load Testing: Baseline Scenario (Simplified)
+# Purpose: Measure normal system performance with steady load
+# Status: Focused on health checks - known working endpoints
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    # Ramp up: gradually increase users over 30 seconds
+    - duration: 30
+      arrivalRate: 10
+      name: "Ramp up"
+
+    # Sustain: maintain load for 2 minutes to collect metrics
+    - duration: 120
+      arrivalRate: 10
+      name: "Sustained load"
+
+    # Ramp down: gradually reduce load over 20 seconds
+    - duration: 20
+      arrivalRate: 0
+      name: "Ramp down"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+      includeQueryString: false
+
+scenarios:
+  - name: "Health Check Baseline"
+    weight: 100
+    flow:
+      - get:
+          url: "/api/system/health"
+          expect:
+            - statusCode: 200
+            - contentType: json

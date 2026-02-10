@@ -1,0 +1,93 @@
+# Load Testing: Stress Scenario
+# Purpose: Find system breaking point and limits
+# Simulates: Continuous high load to identify maximum capacity
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    # Gradual ramp up to heavy load
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp up to stress levels"
+
+    # Sustain heavy load for extended period
+    - duration: 180
+      arrivalRate: 50
+      name: "Prolonged stress test"
+
+    # Try to push even further
+    - duration: 60
+      arrivalRate: 75
+      name: "Maximum stress"
+
+    # Cool down
+    - duration: 30
+      arrivalRate: 0
+      name: "Cool down"
+
+  processor: "./processors/stressProcessor.js"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+
+scenarios:
+  - name: "Prediction Service Stress"
+    weight: 50
+    flow:
+      - post:
+          url: "/api/guest/predict"
+          # Processor will handle converting base64 to multipart form-data
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          timeout: 30
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  - name: "Health Checks Stress"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/system/health"
+          timeout: 15
+          expect:
+            - statusCode: 200
+
+  - name: "Authentication Under Load"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "TestPassword123!"
+          timeout: 10
+
+      # Non-strict expectation to collect data even if fails
+      - get:
+          url: "/api/system/health"
+          timeout: 10
+
+  - name: "Concurrent Predictions Multiple Users"
+    weight: 5
+    flow:
+      - concurrent:
+          - post:
+              url: "/api/guest/predict"
+              # Processor will handle converting base64 to multipart form-data
+              formData:
+                image: "placeholder" # Processor will replace with actual file stream
+              timeout: 30
+          - post:
+              url: "/api/guest/predict"
+              json:
+                image: "{{ $randomString(500) }}"
+              timeout: 30
+          - post:
+              url: "/api/guest/predict"
+              json:
+                image: "{{ $randomString(500) }}"
+              timeout: 30

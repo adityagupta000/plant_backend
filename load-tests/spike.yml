@@ -1,0 +1,79 @@
+# Load Testing: Spike Scenario
+# Purpose: Test system behavior under sudden traffic spikes
+# Simulates: Sudden surge in user traffic (e.g., social media mention, viral post)
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    # Initial low load
+    - duration: 30
+      arrivalRate: 5
+      name: "Initial baseline"
+
+    # SPIKE: Jump to 5x the load in 10 seconds
+    - duration: 10
+      arrivalRate: 25
+      name: "Sudden spike begins"
+
+    # Sustain spike for 60 seconds to see recovery
+    - duration: 60
+      arrivalRate: 25
+      name: "Sustained spike"
+
+    # Another spike after brief period
+    - duration: 5
+      arrivalRate: 5
+      name: "Return to normal"
+
+    - duration: 20
+      arrivalRate: 30
+      name: "Second spike"
+
+    # Cool down
+    - duration: 30
+      arrivalRate: 0
+      name: "Cool down"
+
+  processor: "./processors/spikeProcessor.js"
+
+  variables:
+    testData: ["spike_test"]
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+
+scenarios:
+  - name: "High Volume Guest Predictions"
+    weight: 60
+    flow:
+      - post:
+          url: "/api/guest/predict"
+          # Processor will handle converting base64 to multipart form-data
+          formData:
+            image: "placeholder" # Processor will replace with actual file stream
+          expect:
+            - statusCode: 200
+            - contentType: json
+          capture:
+            json: "$.predictions"
+            as: "predictions"
+
+      - think: 2 # Wait 2 seconds between requests
+
+  - name: "Health Checks"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/system/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Health Checks"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/system/health"
+          expect:
+            - statusCode: 200

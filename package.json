@@ -6,7 +6,9 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon --config nodemon.json src/server.js",
+    "dev:load-test": "cross-env LOAD_TEST=true nodemon --config nodemon.json src/server.js",
     "start": "node src/server.js",
+    "start:load-test": "cross-env LOAD_TEST=true node src/server.js",
     "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles",
     "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage --runInBand",
@@ -23,6 +25,12 @@
     "test:unit:report": "node test-reporter/cli.js unit",
     "test:integration:report": "node test-reporter/cli.js integration",
     "test:e2e:report": "node test-reporter/cli.js e2e",
+    "load-test": "powershell.exe -ExecutionPolicy Bypass -File load-tests/run-load-tests.ps1",
+    "load-test:baseline": "artillery run --output load-tests/reports/baseline.html load-tests/baseline.yml",
+    "load-test:spike": "artillery run --output load-tests/reports/spike.html load-tests/spike.yml",
+    "load-test:stress": "artillery run --output load-tests/reports/stress.html load-tests/stress.yml",
+    "load-test:realistic": "artillery run --output load-tests/reports/realistic.html load-tests/realistic-scenario.yml",
+    "load-test:quick": "artillery quick --count 10 --num 50 load-tests/baseline.yml",
     "check:redis": "redis-cli ping || echo 'Redis not running'",
     "start:redis": "docker run -d -p 6379:6379 --name plant-health-redis redis:alpine"
   },
@@ -55,6 +63,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
+    "artillery": "^2.0.30",
     "cross-env": "^10.1.0",
     "jest": "^29.7.0",
     "jest-extended": "^4.0.2",
