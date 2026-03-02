@@ -2,6 +2,14 @@
 
 > Production-ready Node.js + Python AI backend for plant disease detection
 
+## � Deployment
+
+Want to deploy the backend to AWS? Follow our **[Quick Start Deployment Guide](docs/QUICK_START_DEPLOYMENT.md)** - covers everything from AWS setup to running on EC2 with your free tier credits!
+
+For step-by-step manual instructions, see **[AWS Deployment Guide](docs/AWS_DEPLOYMENT.md)**.
+
+---
+
 ## 📚 Documentation
 
 This project uses organized documentation across multiple files for clarity and maintainability. Click on any section below to view the full documentation:
@@ -15,6 +23,7 @@ This project uses organized documentation across multiple files for clarity and 
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete API endpoint reference with examples
 - **[Security Features](docs/SECURITY_FEATURES.md)** - Authentication, validation, encryption, and privacy
 - **[Getting Started](docs/GETTING_STARTED.md)** - Installation, deployment, and troubleshooting
+- **[AWS Deployment Guide](docs/AWS_DEPLOYMENT.md)** - Comprehensive 8-step AWS deployment guide
 
 ---
 
@@ -35,8 +44,7 @@ This project uses organized documentation across multiple files for clarity and 
 🧪 **Comprehensive Testing** - 101 test cases, 95%+ coverage  
 📊 **Load Testing** - Artillery.js with performance benchmarks  
 🔒 **Enterprise Security** - Helmet.js, CORS, rate limiting, encryption  
-📄 **PDF Reports** - Generate prediction reports as PDFs  
-👤 **Guest Mode** - Anonymous predictions with strict rate limits  
+📄 **PDF Reports** - Generate prediction reports as PDFs
 
 ---
 
