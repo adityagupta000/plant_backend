@@ -42,3 +42,4 @@ logs/*.log
 
 !data/.gitkeep
 !logs/.gitkeep
+ai/secrets/model.key
