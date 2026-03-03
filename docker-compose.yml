@@ -179,10 +179,9 @@ services:
       test:
         [
           "CMD",
-          "redis-cli",
-          "-a",
-          "6bf5e5da70d3e39c9d1a325122218ba15664f07bd6b82540353c7bb5191ce062",
-          "ping",
+          "sh",
+          "-c",
+          'redis-cli -a "$$(cat /run/secrets/redis_password)" ping',
         ]
       interval: 10s
       timeout: 5s

@@ -45,6 +45,8 @@ CMD ["node", "src/server.js"]
 
 ## Docker Compose Configuration
 
+The current configuration uses **inline environment variables** for better security and manageability:
+
 ```yaml
 services:
   backend:
@@ -55,25 +57,42 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
-    env_file:
-      - .env.docker
+
+    # Environment variables - non-secret config (safe for version control)
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # ... (see docker-compose.yml for complete list)
+
+    # Docker Secrets - secure secret management
+    # Mounted at /run/secrets/{secretName} in container
+    secrets:
+      - jwt_access_secret
+      - jwt_refresh_secret
+      - redis_password
+
     volumes:
       - ./data:/app/data # Database files
       - ./uploads:/app/uploads # User uploaded images
       - ./logs:/app/logs # Application logs
       - ./ai/saved_models:/app/ai/saved_models:ro # AI models (read-only)
       - ./ai/secrets:/app/ai/secrets:ro # Encryption keys (read-only)
+
     networks:
       - app-network
+
     depends_on:
       - redis
+
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://localhost:5000/health')",
+          "require('http').get('http://localhost:5000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))",
         ]
       interval: 30s
       timeout: 10s
@@ -86,15 +105,41 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+
+    # Load secrets for Redis password
+    command: >
+      sh -c 'redis-server --appendonly yes 
+      --requirepass $$(cat /run/secrets/redis_password)'
+
+    secrets:
+      - redis_password
+
     volumes:
       - redis-data:/data
+
     networks:
       - app-network
+
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "redis-cli -a $$(cat /run/secrets/redis_password) ping",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+# Docker Secrets - Global secret definitions
+secrets:
+  jwt_access_secret:
+    file: ./secrets/jwt_access_secret.txt
+  jwt_refresh_secret:
+    file: ./secrets/jwt_refresh_secret.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
 
 networks:
   app-network:
@@ -131,6 +176,46 @@ curl http://localhost:5000/health
 
 # Check Redis health
 docker compose exec redis redis-cli ping
+```
+
+## Environment Variables Configuration
+
+**Security Note**: The Docker Compose configuration uses:
+
+1. **Docker Secrets** for sensitive data (JWT secrets, Redis password) - stored in `secrets/` directory
+2. **Inline environment variables** for non-secret configuration
+
+**No `.env` file is needed** - all configuration is defined in `docker-compose.yml`.
+
+However, for local development, you can create a `.env.docker` file (add to `.gitignore`):
+
+```env
+# .env.docker - LOCAL DEVELOPMENT ONLY, DO NOT COMMIT
+NODE_ENV=development
+PORT=5000
+FRONTEND_URL=http://localhost:5173
+
+# Database
+DB_DIALECT=sqlite
+DB_LOGGING=false
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Feature Flags
+GUEST_MODE_ENABLED=true
+PDF_DOWNLOAD_ENABLED=true
+HISTORY_TRACKING_ENABLED=true
+
+# Rate Limiting
+GLOBAL_RATE_MAX=1000
+PREDICTION_RATE_MAX=50
+AUTH_RATE_MAX=10
+
+# AI Service
+AI_WORKERS=4
+AI_SERVICE_TIMEOUT=30000
 ```
 
 ## Environment Variables (.env.docker)
@@ -203,8 +288,51 @@ GUEST_RATE_LIMIT_MAX_REQUESTS=10
 
 ## Security Considerations
 
-1. **Model Files**: AI models are encrypted and keys are stored separately
-2. **Environment Secrets**: Never commit `.env.docker` to version control
-3. **Volume Permissions**: Read-only mounts for sensitive data
-4. **Network Isolation**: Services communicate via internal Docker network
-5. **Health Checks**: Automated health monitoring for all services
+### ✅ Current Implementation
+
+1. **Docker Secrets** - Sensitive data (JWT secrets, Redis password) stored in separate files
+   - Mounted at `/run/secrets/{secretName}` in containers
+   - Never exposed in environment variables or logs
+   - Loaded via `SecretLoader.js` utility
+
+2. **Non-Root User** - Application runs as `appuser` (non-root) for privilege isolation
+   - Reduces attack surface if container is compromised
+   - Proper file permissions enforced
+
+3. **Read-Only Volumes** - AI models and encryption keys mounted read-only
+   - Prevents accidental or malicious modifications
+   - Applied to: `./ai/saved_models` and `./ai/secrets`
+
+4. **Network Isolation** - Services communicate via internal Docker network
+   - Backend and Redis not directly exposed to host network
+   - Only ports explicitly mapped are accessible
+
+5. **Health Checks** - Automatic detection and recovery
+   - Backend health endpoint checked every 30 seconds
+   - Redis connectivity verified every 10 seconds
+   - Failed services automatically restarted
+
+### 🔐 Secret Files Required
+
+Before running Docker, create these files in the `secrets/` directory:
+
+```bash
+# Generate strong secrets (on Linux/Mac)
+openssl rand -hex 32 > secrets/jwt_access_secret.txt
+openssl rand -hex 32 > secrets/jwt_refresh_secret.txt
+openssl rand -hex 32 > secrets/redis_password.txt
+
+# Or on Windows PowerShell
+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((1..32 | ForEach-Object { -join ((48..122) | Get-Random | ForEach-Object {[char]$_}) }))) | Out-File secrets/jwt_access_secret.txt
+# Repeat for other secrets
+```
+
+### ⚠️ Never
+
+- ❌ Commit `secrets/` directory to Git
+- ❌ Hardcode secrets in environment variables
+- ❌ Share secret files over unencrypted channels
+- ❌ Run application as root in production
+- ❌ Mount sensitive volumes as writable
+
+## Security Considerations

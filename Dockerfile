@@ -75,8 +75,9 @@ RUN mkdir -p \
 RUN groupadd -r appuser && useradd -r -g appuser appuser && \
     chown -R appuser:appuser /app
 
-# DEBUG: Temporarily run as root to debug startup issues
-# USER appuser
+# Run as non-root user for security
+# Uncomment next line to disable for debugging (not recommended for production)
+USER appuser
 
 # =============================================================================
 # LAYER 7: Networking & Health Check Configuration
